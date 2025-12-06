@@ -5,6 +5,7 @@ namespace justinholtweb\smoke\controllers;
 use Craft;
 use craft\elements\Entry;
 use craft\web\Controller;
+use craft\web\View;
 use yii\web\Response;
 use justinholtweb\smoke\Plugin;
 
@@ -36,10 +37,10 @@ class EditController extends Controller
         $fields = Plugin::getInstance()->smoke->getEditableFields($element);
 
         // Render the edit panel
-        $html = Craft::$app->getView()->renderTemplate('@justinholtweb/smoke/_components/edit-panel', [
+        $html = Craft::$app->getView()->renderTemplate('smoke/_components/edit-panel', [
             'element' => $element,
             'fields' => $fields,
-        ]);
+        ], View::TEMPLATE_MODE_CP);
 
         // Return DataStar SSE response
         return $this->_asDatastar([
@@ -81,12 +82,12 @@ class EditController extends Controller
         $value = $element->getFieldValue($fieldHandle);
 
         // Render the field editor
-        $html = Craft::$app->getView()->renderTemplate("@justinholtweb/smoke/_field-editors/{$fieldType}", [
+        $html = Craft::$app->getView()->renderTemplate("smoke/_field-editors/{$fieldType}", [
             'element' => $element,
             'field' => $field,
             'fieldHandle' => $fieldHandle,
             'value' => $value,
-        ]);
+        ], View::TEMPLATE_MODE_CP);
 
         return $this->_asDatastar([
             'fragment' => [

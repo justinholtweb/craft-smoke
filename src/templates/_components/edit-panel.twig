@@ -34,7 +34,7 @@
             {% set field = element.getFieldLayout().getFieldByHandle(fieldInfo.handle) %}
             {% set value = element.getFieldValue(fieldInfo.handle) %}
 
-            {% include "@justinholtweb/smoke/_field-editors/#{fieldInfo.type}.twig" with {
+            {% include "smoke/_field-editors/#{fieldInfo.type}.twig" with {
                 field: field,
                 fieldHandle: fieldInfo.handle,
                 value: value,
