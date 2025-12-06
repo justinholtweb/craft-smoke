@@ -44,6 +44,9 @@ class Plugin extends BasePlugin
             }
         );
 
+        // Also set it immediately for better compatibility
+        Craft::$app->view->getTwig()->addGlobal('smoke', new SmokeVariable());
+
         // Register site request listeners
         if (!Craft::$app->getRequest()->getIsCpRequest()) {
             $this->_registerSiteListeners();
