@@ -1,18 +1,37 @@
-{# Smoke Editor Container - Add to your layout #}
+{# Smoke Editor Container - Injected automatically by smoke.init() #}
 
-{% if currentUser and smoke.canEdit(entry ?? null) %}
-    {# Edit Panel Container #}
-    <div
-        id="smoke-editor"
-        data-smoke-open="false"
-        data-store="{smokeEditorOpen: false}"
-    >
-        {# Content will be dynamically loaded here #}
-    </div>
+{# Edit Panel Container #}
+<div
+    id="smoke-editor"
+    data-smoke-open="false"
+    data-store="{smokeEditorOpen: false}"
+>
+    {# Content will be dynamically loaded here #}
+</div>
 
-    {# Floating Edit Button #}
-    {{ smoke.editButton(entry, {
-        label: 'Edit Page',
-        class: 'smoke-edit-btn'
-    })|raw }}
-{% endif %}
+{# Floating Edit Button - Will be populated via JavaScript if entry is editable #}
+<div id="smoke-edit-button-container"></div>
+
+<script>
+// Auto-detect entry from page context and show edit button
+document.addEventListener('DOMContentLoaded', function() {
+    // Look for elements with smoke editable attributes
+    const editableElements = document.querySelectorAll('[data-smoke-editable]');
+    if (editableElements.length > 0) {
+        // Get the element ID from the first editable element
+        const firstEditable = editableElements[0];
+        const elementId = firstEditable.getAttribute('data-smoke-element-id');
+
+        if (elementId) {
+            // Create and inject the edit button
+            const container = document.getElementById('smoke-edit-button-container');
+            const button = document.createElement('button');
+            button.className = 'smoke-edit-btn';
+            button.textContent = 'Edit Page';
+            button.setAttribute('data-on-click', `$$get('/actions/smoke/edit/open?elementId=${elementId}')`);
+            button.setAttribute('data-indicator', 'true');
+            container.appendChild(button);
+        }
+    }
+});
+</script>
