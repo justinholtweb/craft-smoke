@@ -1,0 +1,15 @@
+{# Table Display (after save) #}
+
+<div {{ smoke.editable(element, fieldHandle)|raw }}>
+    {% if value|length %}
+        <table>
+            {% for row in value %}
+                <tr>
+                    {% for cell in row %}
+                        <td>{{ cell }}</td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </table>
+    {% endif %}
+</div>

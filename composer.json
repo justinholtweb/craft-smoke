@@ -1,0 +1,38 @@
+{
+  "name": "justinholtweb/smoke",
+  "description": "On-page frontend editing for Craft CMS using DataStar",
+  "type": "craft-plugin",
+  "version": "0.1.0",
+  "keywords": [
+    "craft",
+    "cms",
+    "craftcms",
+    "craft-plugin",
+    "smoke",
+    "frontend-editing",
+    "datastar"
+  ],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Justin Holt",
+      "homepage": "https://justinholt.com"
+    }
+  ],
+  "require": {
+    "php": ">=8.2",
+    "craftcms/cms": "^5.4.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "justinholtweb\\smoke\\": "src/"
+    }
+  },
+  "extra": {
+    "name": "Smoke",
+    "handle": "smoke",
+    "developer": "Justin Holt",
+    "documentationUrl": "https://github.com/justinholtweb/smoke/blob/main/README.md",
+    "class": "justinholtweb\\smoke\\Plugin"
+  }
+}

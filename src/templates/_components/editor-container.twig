@@ -1,0 +1,18 @@
+{# Smoke Editor Container - Add to your layout #}
+
+{% if currentUser and smoke.canEdit(entry ?? null) %}
+    {# Edit Panel Container #}
+    <div
+        id="smoke-editor"
+        data-smoke-open="false"
+        data-store="{smokeEditorOpen: false}"
+    >
+        {# Content will be dynamically loaded here #}
+    </div>
+
+    {# Floating Edit Button #}
+    {{ smoke.editButton(entry, {
+        label: 'Edit Page',
+        class: 'smoke-edit-btn'
+    })|raw }}
+{% endif %}

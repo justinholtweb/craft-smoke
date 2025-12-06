@@ -1,0 +1,67 @@
+{# Main Edit Panel #}
+
+<div class="smoke-panel-header">
+    <h2 class="smoke-panel-title">Edit {{ element.title }}</h2>
+    <button
+        type="button"
+        class="smoke-close-btn"
+        data-on-click="$$get('/actions/smoke/edit/close')"
+        aria-label="Close"
+    >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+    </button>
+</div>
+
+<div class="smoke-panel-content">
+    <form
+        data-on-submit="$$post('/actions/smoke/save/all')"
+        data-store="{
+            smokeElementId: {{ element.id }},
+            smokeSaving: false,
+            fields: {}
+        }"
+    >
+        {# CSRF Token #}
+        {{ csrfInput() }}
+
+        <input type="hidden" name="elementId" value="{{ element.id }}">
+
+        {# Render each editable field #}
+        {% for fieldInfo in fields %}
+            {% set field = element.getFieldLayout().getFieldByHandle(fieldInfo.handle) %}
+            {% set value = element.getFieldValue(fieldInfo.handle) %}
+
+            {% include "smoke/_field-editors/#{fieldInfo.type}.twig" with {
+                field: field,
+                fieldHandle: fieldInfo.handle,
+                value: value,
+                element: element
+            } %}
+        {% endfor %}
+
+        {# Save Button #}
+        <button
+            type="submit"
+            class="smoke-save-btn"
+            data-bind-disabled="$smokeSaving"
+        >
+            <span data-show="!$smokeSaving">Save Changes</span>
+            <span data-show="$smokeSaving" style="display: flex; align-items: center; justify-content: center;">
+                Saving...
+                <span class="smoke-loading"></span>
+            </span>
+        </button>
+    </form>
+
+    {# Field-specific tips #}
+    <div style="margin-top: 24px; padding: 16px; background: #eff6ff; border-radius: 6px; border-left: 4px solid #2563eb;">
+        <p style="margin: 0; font-size: 13px; color: #1e40af;">
+            <strong>Keyboard Shortcuts:</strong><br>
+            • Press <kbd style="padding: 2px 6px; background: white; border: 1px solid #cbd5e1; border-radius: 3px;">ESC</kbd> to close<br>
+            • Press <kbd style="padding: 2px 6px; background: white; border: 1px solid #cbd5e1; border-radius: 3px;">⌘/Ctrl + S</kbd> to save
+        </p>
+    </div>
+</div>

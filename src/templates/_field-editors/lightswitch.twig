@@ -1,0 +1,25 @@
+{# Lightswitch Field Editor #}
+
+<div class="smoke-field-group">
+    <label class="smoke-field-label">
+        {{ field.name }}
+        {% if field.required %}
+            <span class="smoke-field-required">*</span>
+        {% endif %}
+    </label>
+
+    {% if field.instructions %}
+        <span class="smoke-field-instructions">{{ field.instructions }}</span>
+    {% endif %}
+
+    <label class="smoke-lightswitch">
+        <input
+            type="checkbox"
+            name="{{ fieldHandle }}"
+            value="1"
+            {% if value %}checked{% endif %}
+            data-model="fields.{{ fieldHandle }}"
+        >
+        <span class="smoke-lightswitch-slider"></span>
+    </label>
+</div>

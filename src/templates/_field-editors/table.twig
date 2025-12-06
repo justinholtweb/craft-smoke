@@ -1,0 +1,71 @@
+{# Table Field Editor #}
+
+<div class="smoke-field-group">
+    <label class="smoke-field-label">
+        {{ field.name }}
+        {% if field.required %}
+            <span class="smoke-field-required">*</span>
+        {% endif %}
+    </label>
+
+    {% if field.instructions %}
+        <span class="smoke-field-instructions">{{ field.instructions }}</span>
+    {% endif %}
+
+    <div style="overflow-x: auto;">
+        <table class="smoke-table" id="table-{{ fieldHandle }}">
+            <thead>
+                <tr>
+                    {% for column in field.columns %}
+                        <th>{{ column.heading }}</th>
+                    {% endfor %}
+                    <th style="width: 50px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set rows = value %}
+                {% if rows|length %}
+                    {% for row in rows %}
+                        <tr>
+                            {% for column in field.columns %}
+                                <td>
+                                    <input
+                                        type="text"
+                                        value="{{ row[column.handle] ?? '' }}"
+                                        data-model="fields.{{ fieldHandle }}[{{ loop.parent.loop.index0 }}].{{ column.handle }}"
+                                    >
+                                </td>
+                            {% endfor %}
+                            <td>
+                                <button type="button" onclick="smokeRemoveTableRow(this)" style="color: #ef4444;">×</button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        {% for column in field.columns %}
+                            <td>
+                                <input
+                                    type="text"
+                                    value=""
+                                    data-model="fields.{{ fieldHandle }}[0].{{ column.handle }}"
+                                >
+                            </td>
+                        {% endfor %}
+                        <td>
+                            <button type="button" onclick="smokeRemoveTableRow(this)" style="color: #ef4444;">×</button>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <button
+        type="button"
+        onclick="smokeAddTableRow('table-{{ fieldHandle }}')"
+        style="margin-top: 12px; padding: 8px 16px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; cursor: pointer;"
+    >
+        + Add Row
+    </button>
+</div>

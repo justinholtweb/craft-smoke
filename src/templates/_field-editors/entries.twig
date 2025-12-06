@@ -1,0 +1,39 @@
+{# Entries Field Editor #}
+
+<div class="smoke-field-group">
+    <label class="smoke-field-label">
+        {{ field.name }}
+        {% if field.required %}
+            <span class="smoke-field-required">*</span>
+        {% endif %}
+    </label>
+
+    {% if field.instructions %}
+        <span class="smoke-field-instructions">{{ field.instructions }}</span>
+    {% endif %}
+
+    {% set currentEntries = value.all() %}
+
+    <div style="padding: 12px; background: #f3f4f6; border-radius: 6px;">
+        {% if currentEntries|length %}
+            <ul style="list-style: none; padding: 0; margin: 0;">
+                {% for entry in currentEntries %}
+                    <li style="padding: 6px 0;">{{ entry.title }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p style="margin: 0; color: #6b7280;">No entries selected</p>
+        {% endif %}
+    </div>
+
+    <input
+        type="hidden"
+        name="{{ fieldHandle }}"
+        value="{{ currentEntries|map(e => e.id)|join(',') }}"
+        data-model="fields.{{ fieldHandle }}"
+    >
+
+    <p style="font-size: 12px; color: #6b7280; margin-top: 12px;">
+        Entry selection UI coming soon. For now, use the Control Panel to manage entries.
+    </p>
+</div>

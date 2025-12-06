@@ -1,0 +1,26 @@
+{# Rich Text (CKEditor) Field Editor #}
+
+<div class="smoke-field-group">
+    <label class="smoke-field-label">
+        {{ field.name }}
+        {% if field.required %}
+            <span class="smoke-field-required">*</span>
+        {% endif %}
+    </label>
+
+    {% if field.instructions %}
+        <span class="smoke-field-instructions">{{ field.instructions }}</span>
+    {% endif %}
+
+    <textarea
+        class="smoke-textarea"
+        name="{{ fieldHandle }}"
+        {% if field.required %}required{% endif %}
+        data-model="fields.{{ fieldHandle }}"
+        rows="10"
+    >{{ value }}</textarea>
+
+    <p style="font-size: 12px; color: #6b7280; margin-top: 8px;">
+        Note: Full CKEditor integration coming soon. HTML is supported.
+    </p>
+</div>

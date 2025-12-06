@@ -1,0 +1,14 @@
+{# Assets Display (after save) #}
+
+<div {{ smoke.editable(element, fieldHandle)|raw }}>
+    {% set assets = value.all() %}
+    {% if assets|length %}
+        {% for asset in assets %}
+            {% if asset.kind == 'image' %}
+                <img src="{{ asset.url }}" alt="{{ asset.title }}">
+            {% else %}
+                {{ asset.title }}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+</div>

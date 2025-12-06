@@ -1,0 +1,9 @@
+{# Matrix Display (after save) #}
+
+<div {{ smoke.editable(element, fieldHandle)|raw }}>
+    {# Matrix blocks would be rendered here based on your component router #}
+    {% set blocks = value.all() %}
+    {% for block in blocks %}
+        {{ block.type.name }}
+    {% endfor %}
+</div>

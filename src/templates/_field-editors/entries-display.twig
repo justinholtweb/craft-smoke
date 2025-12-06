@@ -1,0 +1,10 @@
+{# Entries Display (after save) #}
+
+<div {{ smoke.editable(element, fieldHandle)|raw }}>
+    {% set entries = value.all() %}
+    {% if entries|length %}
+        {% for entry in entries %}
+            {{ entry.title }}{% if not loop.last %}, {% endif %}
+        {% endfor %}
+    {% endif %}
+</div>
