@@ -14,7 +14,7 @@ class SmokeAsset extends AssetBundle
 {
     public function init(): void
     {
-        $this->sourcePath = '@yourhandle/smoke/assetbundles/smoke/dist';
+        $this->sourcePath = '@justinholtweb/smoke/assetbundles/smoke/dist';
 
         $this->css = [
             'smoke.css',
