@@ -13,8 +13,8 @@
     }
 
     function initSmoke() {
-        // Add edit indicators to editable fields
-        addEditIndicators();
+        // Setup inline editing for editable fields
+        setupInlineEditing();
 
         // Listen for DataStar signals
         setupSignalListeners();
@@ -24,23 +24,26 @@
     }
 
     /**
-     * Add visual indicators to editable fields
+     * Setup inline editing for editable fields
      */
-    function addEditIndicators() {
-        const editableFields = document.querySelectorAll('[data-smoke-editable="true"]');
+    function setupInlineEditing() {
+        const editableFields = document.querySelectorAll('.smoke-editable[data-smoke-type="plaintext"]');
 
         editableFields.forEach(field => {
             field.addEventListener('click', function(e) {
+                e.stopPropagation();
+
+                // Don't re-edit if already editing
+                if (this.classList.contains('smoke-editing')) {
+                    return;
+                }
+
                 const elementId = this.getAttribute('data-smoke-element-id');
                 const fieldHandle = this.getAttribute('data-smoke-field');
+                const currentValue = this.textContent.trim();
 
-                if (elementId && fieldHandle) {
-                    // Trigger edit via DataStar
-                    const event = new CustomEvent('smoke-edit-field', {
-                        detail: { elementId, fieldHandle }
-                    });
-                    document.dispatchEvent(event);
-                }
+                // Enter editing mode
+                enterInlineEditMode(this, elementId, fieldHandle, currentValue);
             });
 
             // Add tooltip on hover
@@ -49,6 +52,130 @@
                 this.setAttribute('title', `Click to edit ${fieldName}`);
             });
         });
+    }
+
+    /**
+     * Enter inline edit mode for a field
+     */
+    function enterInlineEditMode(element, elementId, fieldHandle, currentValue) {
+        // Mark as editing
+        element.classList.add('smoke-editing');
+
+        // Store original content
+        const originalContent = element.innerHTML;
+
+        // Create input
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'smoke-inline-input';
+        input.value = currentValue;
+
+        // Create action buttons
+        const actions = document.createElement('div');
+        actions.className = 'smoke-inline-actions';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'smoke-inline-btn smoke-inline-save';
+        saveBtn.textContent = 'Save';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'smoke-inline-btn smoke-inline-cancel';
+        cancelBtn.textContent = 'Cancel';
+
+        actions.appendChild(saveBtn);
+        actions.appendChild(cancelBtn);
+
+        // Replace content with input
+        element.innerHTML = '';
+        element.appendChild(input);
+        element.appendChild(actions);
+
+        // Focus input and select all
+        input.focus();
+        input.select();
+
+        // Handle save
+        saveBtn.addEventListener('click', () => {
+            saveInlineEdit(element, elementId, fieldHandle, input.value, originalContent);
+        });
+
+        // Handle cancel
+        cancelBtn.addEventListener('click', () => {
+            cancelInlineEdit(element, originalContent);
+        });
+
+        // Handle Enter key
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveInlineEdit(element, elementId, fieldHandle, input.value, originalContent);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelInlineEdit(element, originalContent);
+            }
+        });
+
+        // Handle click outside
+        const closeOnClickOutside = (e) => {
+            if (!element.contains(e.target)) {
+                cancelInlineEdit(element, originalContent);
+                document.removeEventListener('click', closeOnClickOutside);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeOnClickOutside), 0);
+    }
+
+    /**
+     * Save inline edit
+     */
+    function saveInlineEdit(element, elementId, fieldHandle, newValue, originalContent) {
+        const actions = element.querySelector('.smoke-inline-actions');
+        const saveBtn = actions.querySelector('.smoke-inline-save');
+
+        // Show loading state
+        saveBtn.classList.add('smoke-inline-saving');
+        saveBtn.textContent = 'Saving...';
+
+        // Prepare form data
+        const formData = new FormData();
+        formData.append('elementId', elementId);
+        formData.append('fieldHandle', fieldHandle);
+        formData.append(fieldHandle, newValue);
+        formData.append(window.csrfToken ? 'CRAFT_CSRF_TOKEN' : '', window.csrfToken || '');
+
+        // Save via API
+        fetch('/actions/smoke/save/field', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update element with new value
+                element.classList.remove('smoke-editing');
+                element.textContent = newValue;
+                showNotification('Saved successfully', 'success');
+            } else {
+                throw new Error(data.error || 'Failed to save');
+            }
+        })
+        .catch(error => {
+            // Restore original content on error
+            element.classList.remove('smoke-editing');
+            element.innerHTML = originalContent;
+            showNotification(error.message, 'error');
+        });
+    }
+
+    /**
+     * Cancel inline edit
+     */
+    function cancelInlineEdit(element, originalContent) {
+        element.classList.remove('smoke-editing');
+        element.innerHTML = originalContent;
     }
 
     /**

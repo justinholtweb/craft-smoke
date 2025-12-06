@@ -28,25 +28,24 @@ class SaveController extends Controller
 
         $elementId = Craft::$app->getRequest()->getBodyParam('elementId');
         $fieldHandle = Craft::$app->getRequest()->getBodyParam('fieldHandle');
-        $value = Craft::$app->getRequest()->getBodyParam('value');
+        // Get value from either 'value' param or the field handle param
+        $value = Craft::$app->getRequest()->getBodyParam($fieldHandle) ?? Craft::$app->getRequest()->getBodyParam('value');
 
         $element = Entry::find()->id($elementId)->one();
 
         if (!$element || !Plugin::getInstance()->smoke->canEdit($element)) {
-            return $this->_asDatastar([
-                'signal' => [
-                    'smokeError' => 'You do not have permission to edit this element',
-                ],
+            return $this->asJson([
+                'success' => false,
+                'error' => 'You do not have permission to edit this element',
             ]);
         }
 
         $field = $element->getFieldLayout()?->getFieldByHandle($fieldHandle);
 
         if (!$field) {
-            return $this->_asDatastar([
-                'signal' => [
-                    'smokeError' => 'Field not found',
-                ],
+            return $this->asJson([
+                'success' => false,
+                'error' => 'Field not found',
             ]);
         }
 
@@ -58,37 +57,19 @@ class SaveController extends Controller
             $errors = $element->getErrors();
             $errorMessage = 'Failed to save: ' . implode(', ', array_values($errors)[0] ?? ['Unknown error']);
 
-            return $this->_asDatastar([
-                'signal' => [
-                    'smokeError' => $errorMessage,
-                    'smokeSaving' => false,
-                ],
+            return $this->asJson([
+                'success' => false,
+                'error' => $errorMessage,
             ]);
         }
 
-        // Get the updated value for display
+        // Get the updated value
         $updatedValue = $element->getFieldValue($fieldHandle);
-        $fieldType = Plugin::getInstance()->smoke->getFieldEditorType(get_class($field));
 
-        // Render the updated field display
-        $html = Craft::$app->getView()->renderTemplate("smoke/_field-editors/{$fieldType}-display", [
-            'element' => $element,
-            'field' => $field,
-            'fieldHandle' => $fieldHandle,
+        return $this->asJson([
+            'success' => true,
             'value' => $updatedValue,
-        ], View::TEMPLATE_MODE_CP);
-
-        return $this->_asDatastar([
-            'fragment' => [
-                'selector' => "[data-smoke-field=\"{$fieldHandle}\"]",
-                'html' => $html,
-                'merge' => 'morph',
-            ],
-            'signal' => [
-                'smokeSuccess' => 'Saved successfully',
-                'smokeSaving' => false,
-                'smokeEditorOpen' => false,
-            ],
+            'message' => 'Saved successfully',
         ]);
     }
 
