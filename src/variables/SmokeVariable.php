@@ -47,6 +47,10 @@ class SmokeVariable
             "window.smokeEditor = { active: false, currentField: null };",
             View::POS_HEAD
         );
+
+        // Inject the editor container HTML at the end of the body
+        $containerHtml = $view->renderTemplate('@justinholtweb/smoke/_components/editor-container');
+        $view->registerHtml($containerHtml, View::POS_END);
     }
 
     /**

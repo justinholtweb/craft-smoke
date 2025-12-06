@@ -23,19 +23,16 @@ ddev craft plugin/install smoke
 Edit `templates/_layout.twig` and add Smoke initialization:
 
 ```twig
-{# At the top of your layout, after opening <html> tag #}
-{% do smoke.init() %}
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     {# ... your existing head content ... #}
 </head>
 <body>
-    {# ... your existing body content ... #}
+    {# Initialize Smoke - this automatically injects the editor UI #}
+    {% do smoke.init() %}
 
-    {# Before closing </body> tag, add the Smoke editor container #}
-    {% include '@justinholtweb/smoke/_components/editor-container.twig' %}
+    {# ... your existing body content ... #}
 </body>
 </html>
 ```

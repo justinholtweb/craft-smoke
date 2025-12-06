@@ -23,26 +23,14 @@ php craft clear-caches/all
 
 ## Minimal Integration Test
 
-To test if Smoke is working, add this to `templates/_layout.twig`:
+To test if Smoke is working, add this anywhere in your `templates/_layout.twig`:
 
-### Before `</head>`:
 ```twig
+{# Initialize Smoke - automatically injects editor UI for logged-in users #}
 {% do smoke.init() %}
 ```
 
-### Before `</body>`:
-```twig
-{% if currentUser %}
-    <div
-        id="smoke-editor"
-        data-smoke-open="false"
-    ></div>
-
-    {% if entry is defined and smoke.canEdit(entry) %}
-        {{ smoke.editButton(entry)|raw }}
-    {% endif %}
-{% endif %}
-```
+That's it! The editor container and edit button will be automatically injected.
 
 ## Test on a Simple Page
 

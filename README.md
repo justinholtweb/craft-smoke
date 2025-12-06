@@ -79,11 +79,8 @@ ddev craft plugin/install smoke
 Add the following to your main layout template (e.g., `templates/_layout.twig`):
 
 ```twig
-{# Initialize Smoke editor #}
+{# Initialize Smoke editor - this automatically injects the editor container #}
 {% do smoke.init() %}
-
-{# Add editor container before closing body tag #}
-{% include '@justinholtweb/smoke/_components/editor-container.twig' %}
 ```
 
 ### 5. Make Fields Editable
