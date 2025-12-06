@@ -37,33 +37,56 @@ Smoke enables content editors to edit Craft CMS entries directly on the frontend
 
 ## Installation
 
-### 1. Install via Composer
+### 1. Add to composer.json
 
-Since this is a local plugin, it's already configured in your `composer.json`:
+Add the GitHub repository to your project's `composer.json`:
 
-```bash
-ddev composer install
+```json
+"repositories": [
+    {
+        "type": "vcs",
+        "url": "https://github.com/justinholtweb/smoke"
+    }
+]
 ```
 
-### 2. Install the Plugin
+### 2. Install via Composer
+
+```bash
+composer require justinholtweb/smoke
+```
+
+Or if using DDEV:
+
+```bash
+ddev composer require justinholtweb/smoke
+```
+
+### 3. Install the Plugin
+
+```bash
+php craft plugin/install smoke
+```
+
+Or with DDEV:
 
 ```bash
 ddev craft plugin/install smoke
 ```
 
-### 3. Add to Your Layout
+### 4. Add to Your Layout
 
-Add the following to your main layout template ([templates/_layout.twig](../../templates/_layout.twig)):
+Add the following to your main layout template (e.g., `templates/_layout.twig`):
 
 ```twig
 {# Initialize Smoke editor #}
 {% do smoke.init() %}
 
 {# Add editor container before closing body tag #}
-{% include 'smoke/_components/editor-container.twig' %}
+{% include '@justinholtweb/smoke/_components/editor-container.twig' %}
 ```
 
-### 4. Make Fields Editable
+### 5. Make Fields Editable
 
 In your component templates, wrap editable content with the `smoke.editable()` function:
 
@@ -116,7 +139,7 @@ A floating "Edit Page" button will appear for logged-in users with edit permissi
 ### File Structure
 
 ```
-plugins/smoke/
+vendor/justinholtweb/smoke/
 ├── src/
 │   ├── Plugin.php                     # Main plugin class
 │   ├── controllers/

@@ -1,13 +1,20 @@
 # Smoke Integration Example
 
-This guide shows how to integrate Smoke into your CKC website.
+This guide shows how to integrate Smoke into your Craft CMS website.
 
 ## Step 1: Install the Plugin
 
-Since DDEV/composer commands aren't available in this environment, manually run:
+Run the following commands:
 
 ```bash
-ddev composer update yourhandle/smoke
+composer require justinholtweb/smoke
+php craft plugin/install smoke
+```
+
+Or with DDEV:
+
+```bash
+ddev composer require justinholtweb/smoke
 ddev craft plugin/install smoke
 ```
 
@@ -28,7 +35,7 @@ Edit `templates/_layout.twig` and add Smoke initialization:
     {# ... your existing body content ... #}
 
     {# Before closing </body> tag, add the Smoke editor container #}
-    {% include 'smoke/_components/editor-container.twig' %}
+    {% include '@justinholtweb/smoke/_components/editor-container.twig' %}
 </body>
 </html>
 ```

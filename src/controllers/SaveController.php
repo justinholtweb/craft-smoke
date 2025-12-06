@@ -70,7 +70,7 @@ class SaveController extends Controller
         $fieldType = Plugin::getInstance()->smoke->getFieldEditorType(get_class($field));
 
         // Render the updated field display
-        $html = Craft::$app->getView()->renderTemplate("smoke/_field-editors/{$fieldType}-display", [
+        $html = Craft::$app->getView()->renderTemplate("@justinholtweb/smoke/_field-editors/{$fieldType}-display", [
             'element' => $element,
             'field' => $field,
             'fieldHandle' => $fieldHandle,

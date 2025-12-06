@@ -5,14 +5,20 @@
 Run these commands in your terminal:
 
 ```bash
-# 1. Update composer to install the Smoke plugin
-ddev composer update yourhandle/smoke
+# 1. Install the Smoke plugin via Composer
+composer require justinholtweb/smoke
+# or with DDEV:
+# ddev composer require justinholtweb/smoke
 
 # 2. Install the plugin in Craft
-ddev craft plugin/install smoke
+php craft plugin/install smoke
+# or with DDEV:
+# ddev craft plugin/install smoke
 
 # 3. Clear caches
-ddev craft clear-caches/all
+php craft clear-caches/all
+# or with DDEV:
+# ddev craft clear-caches/all
 ```
 
 ## Minimal Integration Test
@@ -67,11 +73,11 @@ Then:
 
 ## Verify Installation
 
-Check that these files exist:
+Check that the plugin assets are available:
 
 ```bash
-ls -la plugins/smoke/src/
-ls -la plugins/smoke/src/assetbundles/smoke/dist/
+ls -la vendor/justinholtweb/smoke/src/
+ls -la vendor/justinholtweb/smoke/src/assetbundles/smoke/dist/
 ```
 
 You should see:

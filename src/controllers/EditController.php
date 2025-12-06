@@ -36,7 +36,7 @@ class EditController extends Controller
         $fields = Plugin::getInstance()->smoke->getEditableFields($element);
 
         // Render the edit panel
-        $html = Craft::$app->getView()->renderTemplate('smoke/_components/edit-panel', [
+        $html = Craft::$app->getView()->renderTemplate('@justinholtweb/smoke/_components/edit-panel', [
             'element' => $element,
             'fields' => $fields,
         ]);
@@ -81,7 +81,7 @@ class EditController extends Controller
         $value = $element->getFieldValue($fieldHandle);
 
         // Render the field editor
-        $html = Craft::$app->getView()->renderTemplate("smoke/_field-editors/{$fieldType}", [
+        $html = Craft::$app->getView()->renderTemplate("@justinholtweb/smoke/_field-editors/{$fieldType}", [
             'element' => $element,
             'field' => $field,
             'fieldHandle' => $fieldHandle,
