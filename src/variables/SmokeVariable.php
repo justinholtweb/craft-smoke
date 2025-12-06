@@ -49,7 +49,10 @@ class SmokeVariable
         );
 
         // Inject the editor container HTML at the end of the body
-        $containerHtml = $view->renderTemplate('@justinholtweb/smoke/_components/editor-container');
+        $oldTemplateMode = $view->getTemplateMode();
+        $view->setTemplateMode(View::TEMPLATE_MODE_CP);
+        $containerHtml = $view->renderTemplate('smoke/_components/editor-container');
+        $view->setTemplateMode($oldTemplateMode);
         $view->registerHtml($containerHtml, View::POS_END);
     }
 
