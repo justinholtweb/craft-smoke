@@ -2,7 +2,7 @@
   "name": "justinholtweb/smoke",
   "description": "On-page frontend editing for Craft CMS using DataStar",
   "type": "craft-plugin",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "keywords": [
     "craft",
     "cms",
