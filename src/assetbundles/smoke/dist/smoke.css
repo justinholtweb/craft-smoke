@@ -1,19 +1,19 @@
 /* Smoke Editor Styles */
 
 /* Editable field indicator */
-.smoke-editable {
+[data-smoke-type="plaintext"] {
     position: relative;
-    display: inline-block;
     border-radius: 4px;
     transition: all 0.2s ease;
+    cursor: pointer;
 }
 
-.smoke-editable:hover {
+[data-smoke-type="plaintext"]:hover {
     background: rgba(59, 130, 246, 0.05);
 }
 
 /* Edit icon */
-.smoke-editable::after {
+[data-smoke-type="plaintext"]::after {
     content: '';
     position: absolute;
     top: -8px;
@@ -34,13 +34,13 @@
     z-index: 10;
 }
 
-.smoke-editable:hover::after {
+[data-smoke-type="plaintext"]:hover::after {
     opacity: 1;
     transform: scale(1);
 }
 
 /* Inline editing mode */
-.smoke-editable.smoke-editing {
+[data-smoke-type="plaintext"].smoke-editing {
     outline: 2px solid #2563eb;
     outline-offset: 2px;
     background: white;
@@ -48,7 +48,7 @@
     border-radius: 4px;
 }
 
-.smoke-editable.smoke-editing::after {
+[data-smoke-type="plaintext"].smoke-editing::after {
     display: none;
 }
 

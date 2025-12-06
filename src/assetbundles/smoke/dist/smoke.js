@@ -27,7 +27,7 @@
      * Setup inline editing for editable fields
      */
     function setupInlineEditing() {
-        const editableFields = document.querySelectorAll('.smoke-editable[data-smoke-type="plaintext"]');
+        const editableFields = document.querySelectorAll('[data-smoke-type="plaintext"]');
 
         editableFields.forEach(field => {
             field.addEventListener('click', function(e) {

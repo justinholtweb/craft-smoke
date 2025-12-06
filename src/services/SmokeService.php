@@ -150,7 +150,6 @@ class SmokeService extends Component
         $fieldType = $this->getFieldEditorType(get_class($field));
 
         return [
-            'class' => 'smoke-editable',
             'data-smoke-editable' => 'true',
             'data-smoke-element-id' => $element->id,
             'data-smoke-field' => $fieldHandle,
