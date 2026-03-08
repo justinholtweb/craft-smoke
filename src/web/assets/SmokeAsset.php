@@ -1,9 +1,8 @@
 <?php
 
-namespace justinholtweb\smoke\assetbundles\smoke;
+namespace justinholtweb\smoke\web\assets;
 
 use craft\web\AssetBundle;
-use craft\web\assets\cp\CpAsset;
 
 /**
  * Smoke Asset Bundle
@@ -14,7 +13,7 @@ class SmokeAsset extends AssetBundle
 {
     public function init(): void
     {
-        $this->sourcePath = '@justinholtweb/smoke/assetbundles/smoke/dist';
+        $this->sourcePath = '@justinholtweb/smoke/web/assets/dist';
 
         $this->css = [
             'smoke.css',

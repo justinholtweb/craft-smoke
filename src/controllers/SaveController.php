@@ -5,8 +5,8 @@ namespace justinholtweb\smoke\controllers;
 use Craft;
 use craft\elements\Entry;
 use craft\web\Controller;
-use craft\web\View;
 use yii\web\Response;
+use justinholtweb\smoke\helpers\DatastarHelper;
 use justinholtweb\smoke\Plugin;
 
 /**
@@ -87,7 +87,7 @@ class SaveController extends Controller
         $element = Entry::find()->id($elementId)->one();
 
         if (!$element || !Plugin::getInstance()->smoke->canEdit($element)) {
-            return $this->_asDatastar([
+            return DatastarHelper::response([
                 'signal' => [
                     'smokeError' => 'Permission denied',
                 ],
@@ -104,7 +104,7 @@ class SaveController extends Controller
             $errors = $element->getErrors();
             $errorMessage = 'Failed to save: ' . implode(', ', array_values($errors)[0] ?? ['Unknown error']);
 
-            return $this->_asDatastar([
+            return DatastarHelper::response([
                 'signal' => [
                     'smokeError' => $errorMessage,
                     'smokeSaving' => false,
@@ -112,42 +112,12 @@ class SaveController extends Controller
             ]);
         }
 
-        return $this->_asDatastar([
+        return DatastarHelper::response([
             'signal' => [
                 'smokeSuccess' => 'All changes saved successfully',
                 'smokeSaving' => false,
                 'smokeEditorOpen' => false,
             ],
         ]);
-    }
-
-    /**
-     * Format response as DataStar SSE events
-     */
-    private function _asDatastar(array $events): Response
-    {
-        $response = Craft::$app->getResponse();
-        $response->format = Response::FORMAT_RAW;
-        $response->headers->set('Content-Type', 'text/event-stream');
-        $response->headers->set('Cache-Control', 'no-cache');
-        $response->headers->set('X-Accel-Buffering', 'no');
-
-        $data = '';
-
-        // Fragment events (DOM patches)
-        if (isset($events['fragment'])) {
-            $data .= "event: datastar-fragment\n";
-            $data .= 'data: ' . json_encode($events['fragment']) . "\n\n";
-        }
-
-        // Signal events (state updates)
-        if (isset($events['signal'])) {
-            $data .= "event: datastar-signal\n";
-            $data .= 'data: ' . json_encode($events['signal']) . "\n\n";
-        }
-
-        $response->data = $data;
-
-        return $response;
     }
 }

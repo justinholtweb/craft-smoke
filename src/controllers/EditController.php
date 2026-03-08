@@ -7,6 +7,7 @@ use craft\elements\Entry;
 use craft\web\Controller;
 use craft\web\View;
 use yii\web\Response;
+use justinholtweb\smoke\helpers\DatastarHelper;
 use justinholtweb\smoke\Plugin;
 
 /**
@@ -43,7 +44,7 @@ class EditController extends Controller
         ], View::TEMPLATE_MODE_CP);
 
         // Return DataStar SSE response
-        return $this->_asDatastar([
+        return DatastarHelper::response([
             'fragment' => [
                 'selector' => '#smoke-editor',
                 'html' => $html,
@@ -89,7 +90,7 @@ class EditController extends Controller
             'value' => $value,
         ], View::TEMPLATE_MODE_CP);
 
-        return $this->_asDatastar([
+        return DatastarHelper::response([
             'fragment' => [
                 'selector' => '#smoke-field-editor',
                 'html' => $html,
@@ -103,42 +104,12 @@ class EditController extends Controller
      */
     public function actionClose(): Response
     {
-        return $this->_asDatastar([
+        return DatastarHelper::response([
             'signal' => [
                 'smokeEditorOpen' => false,
                 'smokeElementId' => null,
                 'smokeCurrentField' => null,
             ],
         ]);
-    }
-
-    /**
-     * Format response as DataStar SSE events
-     */
-    private function _asDatastar(array $events): Response
-    {
-        $response = Craft::$app->getResponse();
-        $response->format = Response::FORMAT_RAW;
-        $response->headers->set('Content-Type', 'text/event-stream');
-        $response->headers->set('Cache-Control', 'no-cache');
-        $response->headers->set('X-Accel-Buffering', 'no');
-
-        $data = '';
-
-        // Fragment events (DOM patches)
-        if (isset($events['fragment'])) {
-            $data .= "event: datastar-fragment\n";
-            $data .= 'data: ' . json_encode($events['fragment']) . "\n\n";
-        }
-
-        // Signal events (state updates)
-        if (isset($events['signal'])) {
-            $data .= "event: datastar-signal\n";
-            $data .= 'data: ' . json_encode($events['signal']) . "\n\n";
-        }
-
-        $response->data = $data;
-
-        return $response;
     }
 }

@@ -7,7 +7,7 @@ use craft\base\ElementInterface;
 use craft\helpers\Html;
 use craft\web\View;
 use justinholtweb\smoke\Plugin;
-use justinholtweb\smoke\assetbundles\smoke\SmokeAsset;
+use justinholtweb\smoke\web\assets\SmokeAsset;
 
 /**
  * Smoke Variable

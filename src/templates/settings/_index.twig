@@ -1,0 +1,9 @@
+{% import '_includes/forms.twig' as forms %}
+
+{{ forms.lightswitchField({
+    label: 'Enabled'|t('smoke'),
+    instructions: 'Whether Smoke frontend editing is enabled.'|t('smoke'),
+    id: 'enabled',
+    name: 'enabled',
+    on: settings.enabled,
+}) }}

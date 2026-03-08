@@ -1,94 +1,65 @@
-# Smoke - Frontend Editing for Craft CMS
+# Smoke — Frontend Editing for Craft CMS
 
-**Proof of Concept** - On-page frontend editing for Craft CMS powered by DataStar.
+On-page frontend editing for Craft CMS 5, powered by [DataStar](https://data-star.dev/).
 
-## Overview
+## Requirements
 
-Smoke enables content editors to edit Craft CMS entries directly on the frontend of your website using a lightweight, reactive interface powered by [DataStar](https://data-star.dev/).
-
-## Features
-
-### ✅ Implemented (POC)
-
-- **Inline Editing Panel**: Slide-out panel with all editable fields
-- **Field Type Support**:
-  - ✅ Plain Text
-  - ✅ Rich Text (CKEditor) - basic textarea for now
-  - ✅ Lightswitch
-  - ✅ Dropdown
-  - ✅ Table
-  - 🚧 Assets (display only)
-  - 🚧 Entries/Categories/Tags/Users (display only)
-  - 🚧 Matrix (display only)
-- **Permission Aware**: Only shows edit controls to authorized users
-- **Mobile Responsive**: Works on all screen sizes
-- **Keyboard Shortcuts**: ESC to close, Cmd/Ctrl+S to save
-
-### 🚧 Planned Features
-
-- Full CKEditor integration for rich text
-- Asset selector with upload
-- Relationship field pickers (entries, categories, tags, users)
-- Matrix block editing and reordering
-- Auto-save and draft support
-- Revision history
-- Multi-language support
-- Live preview updates
+- Craft CMS 5.4+
+- PHP 8.2+
 
 ## Installation
 
-### 1. Add to composer.json
+### Via Composer
 
-Add the GitHub repository to your project's `composer.json`:
+Add the repository to your project's `composer.json`:
 
 ```json
 "repositories": [
     {
         "type": "vcs",
-        "url": "https://github.com/justinholtweb/smoke"
+        "url": "https://github.com/justinholtweb/craft-smoke"
     }
 ]
 ```
 
-### 2. Install via Composer
+Then require and install:
 
 ```bash
-composer require justinholtweb/smoke
-```
-
-Or if using DDEV:
-
-```bash
-ddev composer require justinholtweb/smoke
-```
-
-### 3. Install the Plugin
-
-```bash
+composer require justinholtweb/craft-smoke
 php craft plugin/install smoke
 ```
 
-Or with DDEV:
+### Local Development
 
-```bash
-ddev craft plugin/install smoke
+```json
+"repositories": [
+    {
+        "type": "path",
+        "url": "../craft-smoke"
+    }
+],
+"require": {
+    "justinholtweb/craft-smoke": "@dev"
+}
 ```
 
-### 4. Add to Your Layout
+## Usage
 
-Add the following to your main layout template (e.g., `templates/_layout.twig`):
+### 1. Initialize in Your Layout
+
+Add to your main layout template (e.g., `templates/_layout.twig`):
 
 ```twig
-{# Initialize Smoke editor - this automatically injects the editor container #}
 {% do smoke.init() %}
 ```
 
-### 5. Make Fields Editable
+This automatically injects the editor container, assets, and DataStar for logged-in users with edit permissions.
 
-In your component templates, wrap editable content with the `smoke.editable()` function:
+### 2. Mark Fields as Editable
+
+In your component templates, add `smoke.editable()` attributes to editable elements:
 
 ```twig
-{# Example: Making a text field editable #}
 <h1 {{ smoke.editable(entry, 'title')|raw }}>
     {{ entry.title }}
 </h1>
@@ -98,179 +69,57 @@ In your component templates, wrap editable content with the `smoke.editable()` f
 </div>
 ```
 
-## Usage
-
-### Basic Example
-
-```twig
-{# In your template #}
-<div class="content">
-    <h1 {{ smoke.editable(entry, 'heroHeading')|raw }}>
-        {{ entry.heroHeading }}
-    </h1>
-
-    <div {{ smoke.editable(entry, 'description')|raw }}>
-        {{ entry.description }}
-    </div>
-</div>
-```
-
-### Using the Edit Button
-
-A floating "Edit Page" button will appear for logged-in users with edit permissions. Clicking it opens the edit panel with all editable fields.
-
-### Keyboard Shortcuts
-
-- **ESC** - Close edit panel
-- **Cmd/Ctrl + S** - Save changes
-
-## Architecture
-
-### How It Works
-
-1. **DataStar Integration**: Uses DataStar for reactive updates without heavy JavaScript frameworks
-2. **SSE Responses**: Server sends HTML fragments via Server-Sent Events
-3. **DOM Morphing**: Updates only changed parts of the page
-4. **Permission-Based**: Respects Craft's built-in permission system
-
-### File Structure
-
-```
-vendor/justinholtweb/smoke/
-├── src/
-│   ├── Plugin.php                     # Main plugin class
-│   ├── controllers/
-│   │   ├── EditController.php         # Handles edit panel requests
-│   │   └── SaveController.php         # Handles save operations
-│   ├── services/
-│   │   └── SmokeService.php           # Core editing logic
-│   ├── variables/
-│   │   └── SmokeVariable.php          # Twig template API
-│   ├── assetbundles/
-│   │   └── smoke/
-│   │       ├── SmokeAsset.php
-│   │       └── dist/
-│   │           ├── smoke.css          # Editor styles
-│   │           └── smoke.js           # Frontend interactions
-│   └── templates/
-│       ├── _components/
-│       │   ├── edit-panel.twig        # Main edit UI
-│       │   └── editor-container.twig   # Container template
-│       └── _field-editors/
-│           ├── plaintext.twig         # Field-specific editors
-│           ├── richtext.twig
-│           ├── lightswitch.twig
-│           └── ...
-└── composer.json
-```
-
-### Twig API
-
-#### `smoke.init()`
-Initializes the Smoke editor (loads DataStar and assets).
-
-```twig
-{% do smoke.init() %}
-```
-
-#### `smoke.canEdit(entry)`
-Check if the current user can edit an entry.
-
-```twig
-{% if smoke.canEdit(entry) %}
-    <button>Edit</button>
-{% endif %}
-```
-
-#### `smoke.editable(entry, fieldHandle)`
-Generate editable attributes for a field.
-
-```twig
-<div {{ smoke.editable(entry, 'myField')|raw }}>
-    {{ entry.myField }}
-</div>
-```
-
-#### `smoke.editButton(entry, options)`
-Generate an edit button.
-
-```twig
-{{ smoke.editButton(entry, {
-    label: 'Edit Page',
-    class: 'my-custom-class'
-})|raw }}
-```
-
-## Development
-
-### Requirements
-
-- PHP 8.2+
-- Craft CMS 5.4+
-
-### Testing
+### 3. Edit on the Frontend
 
 1. Log in to Craft CMS
 2. Visit any entry page on the frontend
-3. Look for the floating "Edit Page" button
-4. Click to open the edit panel
-5. Make changes and save
+3. Click the floating "Edit Page" button
+4. Make changes in the slide-out panel
+5. Save with the button or **Cmd/Ctrl+S**
+6. Press **ESC** to close
 
-### Customization
+## Supported Field Types
 
-#### Custom Styles
+| Type | Status |
+|------|--------|
+| Plain Text | Fully functional (inline + panel editing) |
+| Rich Text (CKEditor) | Panel editing (basic textarea) |
+| Lightswitch | Fully functional |
+| Dropdown | Fully functional |
+| Table | Fully functional (add/remove rows) |
+| Assets | Display only |
+| Entries / Categories / Tags / Users | Display only |
+| Matrix | Display only |
 
-Override Smoke's styles by adding custom CSS after the asset bundle:
+## Twig API
 
-```css
-.smoke-edit-btn {
-    background: your-brand-color;
-}
-```
+### `smoke.init()`
+Loads DataStar, registers CSS/JS assets, and injects the editor container.
 
-#### Adding Field Types
+### `smoke.canEdit(entry)`
+Returns `true` if the current user can edit the element.
 
-To add support for a new field type:
+### `smoke.editable(entry, 'fieldHandle')`
+Returns HTML data attributes that mark an element as editable.
+
+### `smoke.editButton(entry, options)`
+Generates an edit button element. Options: `label` (default: `'Edit'`), `class`.
+
+## Adding Field Type Support
 
 1. Add the field class to `SmokeService::isFieldTypeSupported()`
 2. Map it in `SmokeService::getFieldEditorType()`
-3. Create editor template: `templates/_field-editors/{type}.twig`
-4. Create display template: `templates/_field-editors/{type}-display.twig`
+3. Create `src/templates/_field-editors/{type}.twig`
+4. Create `src/templates/_field-editors/{type}-display.twig`
 
 ## Troubleshooting
 
-### Edit button doesn't appear
+**Edit button doesn't appear** — Ensure you're logged in with edit permissions and `smoke.init()` is called in your layout.
 
-- Ensure you're logged in with edit permissions
-- Check that `smoke.init()` is called in your layout
-- Verify the editor container is included
+**Fields aren't editable** — Verify `smoke.editable()` is added, the field type is supported, and the field exists in the entry's field layout.
 
-### Fields aren't editable
-
-- Make sure `smoke.editable()` attributes are added
-- Check that the field type is supported
-- Verify the field exists in the entry's field layout
-
-### Save fails
-
-- Check PHP error logs
-- Ensure the field handle is correct
-- Verify you have permission to edit the entry
-- Check for validation errors
-
-## Credits
-
-- Built with [DataStar](https://data-star.dev/)
-- Inspired by [Craft DataStar Plugin](https://github.com/putyourlightson/craft-datastar)
+**Save fails** — Check PHP error logs, verify the field handle is correct and you have edit permissions.
 
 ## License
 
-MIT
-
-## Roadmap
-
-See [GitHub Issues](#) for planned features and known bugs.
-
----
-
-**Note**: This is a proof of concept. Use in production at your own risk. Contributions welcome!
+This plugin is released under the [Craft License](https://craftcms.github.io/license/).

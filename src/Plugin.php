@@ -3,8 +3,10 @@
 namespace justinholtweb\smoke;
 
 use Craft;
+use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\web\twig\variables\CraftVariable;
+use justinholtweb\smoke\models\Settings;
 use justinholtweb\smoke\services\SmokeService;
 use justinholtweb\smoke\variables\SmokeVariable;
 use yii\base\Event;
@@ -13,12 +15,13 @@ use yii\base\Event;
  * Smoke plugin
  *
  * @method static Plugin getInstance()
+ * @method Settings getSettings()
  * @property-read SmokeService $smoke
  */
 class Plugin extends BasePlugin
 {
     public string $schemaVersion = '0.1.0';
-    public bool $hasCpSettings = false;
+    public bool $hasCpSettings = true;
 
     public static function config(): array
     {
@@ -33,7 +36,29 @@ class Plugin extends BasePlugin
     {
         parent::init();
 
-        // Register Twig variable
+        $this->_registerVariables();
+
+        if (Craft::$app->getRequest()->getIsSiteRequest()) {
+            $this->_registerSiteListeners();
+        }
+
+        Craft::info('Smoke plugin loaded', __METHOD__);
+    }
+
+    protected function createSettingsModel(): ?Model
+    {
+        return new Settings();
+    }
+
+    protected function settingsHtml(): ?string
+    {
+        return Craft::$app->getView()->renderTemplate('smoke/settings/_index', [
+            'settings' => $this->getSettings(),
+        ]);
+    }
+
+    private function _registerVariables(): void
+    {
         Event::on(
             CraftVariable::class,
             CraftVariable::EVENT_INIT,
@@ -43,23 +68,10 @@ class Plugin extends BasePlugin
                 $variable->set('smoke', SmokeVariable::class);
             }
         );
-
-        // Also set it immediately for better compatibility
-        Craft::$app->view->getTwig()->addGlobal('smoke', new SmokeVariable());
-
-        // Register site request listeners
-        if (!Craft::$app->getRequest()->getIsCpRequest()) {
-            $this->_registerSiteListeners();
-        }
-
-        Craft::info(
-            'Smoke plugin loaded',
-            __METHOD__
-        );
     }
 
     private function _registerSiteListeners(): void
     {
-        // Additional site-specific event listeners can be added here
+        // TODO: Additional site-specific event listeners
     }
 }
