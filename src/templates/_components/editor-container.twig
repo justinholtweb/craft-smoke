@@ -1,74 +1,38 @@
-{# Smoke Editor Container - Injected automatically by smoke.init() #}
+{# Smoke Editor Container — injected automatically by craft.smoke.init() #}
 
-{# Edit Panel Container #}
+{# Slide-out panel host. The panel HTML is morphed into #smoke-editor via DataStar SSE.
+   $smokeEditorOpen drives the slide-in (see #smoke-editor[data-smoke-open="true"] in smoke.css). #}
 <div
     id="smoke-editor"
-    data-smoke-open="false"
-    data-store="{smokeEditorOpen: false}"
->
-    {# Content will be dynamically loaded here #}
+    data-signals="{smokeEditorOpen: false, smokeElementId: null, smokeSaving: false, smokeSuccess: '', smokeError: '', smokeSavedFields: null}"
+    data-attr:data-smoke-open="$smokeEditorOpen ? 'true' : 'false'"
+></div>
+
+{# When the panel saves, the server patches `smokeSavedFields`; apply those values to the
+   on-page display elements (live refresh). on-signal-patch fires whenever signals change. #}
+<div data-on-signal-patch="window.smokeApplySavedFields($smokeSavedFields)" hidden></div>
+
+{# Floating "Edit Page" button. Rendered server-side so DataStar binds it during its initial
+   scan (avoids a first-click race). The element id is resolved from the page at click time.
+   smoke.js reveals it only when the page actually has editable fields. #}
+<div id="smoke-edit-button-container">
+    <button
+        class="smoke-edit-btn"
+        data-on:click="@get('/actions/smoke/edit/open?elementId=' + (document.querySelector('[data-smoke-editable]')?.getAttribute('data-smoke-element-id') || ''))"
+        hidden
+    >Edit Page</button>
 </div>
 
-{# Floating Edit Button - Auto-shows when editable fields are present #}
-<div id="smoke-edit-button-container"></div>
-
-<script>
-(function() {
-    // Wait for both DOM and DataStar to be ready
-    function initEditButton() {
-        // Look for elements with smoke editable attributes
-        const editableElements = document.querySelectorAll('[data-smoke-editable]');
-        if (editableElements.length > 0) {
-            // Get the element ID from the first editable element
-            const firstEditable = editableElements[0];
-            const elementId = firstEditable.getAttribute('data-smoke-element-id');
-
-            if (elementId) {
-                // Create the edit button container with DataStar binding
-                const container = document.getElementById('smoke-edit-button-container');
-
-                // Create button with inline onclick instead of DataStar attribute
-                const button = document.createElement('button');
-                button.className = 'smoke-edit-btn';
-                button.textContent = 'Edit Page';
-                button.onclick = function() {
-                    // Manually fetch and open the editor
-                    fetch('/actions/smoke/edit/open?elementId=' + elementId, {
-                        headers: {
-                            'Accept': 'text/event-stream',
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
-                    })
-                    .then(response => response.text())
-                    .then(data => {
-                        // Parse SSE response and update DOM
-                        const events = data.split('\n\n').filter(e => e.trim());
-                        events.forEach(event => {
-                            if (event.includes('event: datastar-fragment')) {
-                                const dataLine = event.split('\n').find(line => line.startsWith('data: '));
-                                if (dataLine) {
-                                    const fragmentData = JSON.parse(dataLine.substring(6));
-                                    const target = document.querySelector(fragmentData.selector);
-                                    if (target) {
-                                        target.innerHTML = fragmentData.html;
-                                        target.setAttribute('data-smoke-open', 'true');
-                                    }
-                                }
-                            }
-                        });
-                    });
-                };
-
-                container.appendChild(button);
-            }
-        }
-    }
-
-    // Initialize when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initEditButton);
-    } else {
-        initEditButton();
-    }
-})();
-</script>
+{# Feedback toasts, driven by signals the server patches in. Auto-clear after a few seconds. #}
+<div
+    class="smoke-notification smoke-notification-success"
+    data-show="$smokeSuccess !== ''"
+    data-text="$smokeSuccess"
+    data-effect="$smokeSuccess !== '' && setTimeout(() => $smokeSuccess = '', 3000)"
+></div>
+<div
+    class="smoke-notification smoke-notification-error"
+    data-show="$smokeError !== ''"
+    data-text="$smokeError"
+    data-effect="$smokeError !== '' && setTimeout(() => $smokeError = '', 4000)"
+></div>

@@ -33,20 +33,22 @@ class SmokeVariable
             return;
         }
 
-        // Register the asset bundle
+        // Register the asset bundle (CSS, smoke.js, and the vendored DataStar 1.0 module)
         $view->registerAssetBundle(SmokeAsset::class);
 
-        // Add DataStar from CDN
-        $view->registerJsFile(
-            'https://cdn.jsdelivr.net/npm/@sudodevnull/datastar@1.0.0-beta.6/dist/datastar.min.js',
-            ['position' => View::POS_HEAD]
-        );
-
-        // Initialize Smoke editor state
-        $view->registerJs(
-            "window.smokeEditor = { active: false, currentField: null };",
-            View::POS_HEAD
-        );
+        // Expose the CSRF token to smoke.js so inline saves can authenticate.
+        // (Craft requires a CSRF token on POST; the frontend has no automatic source for it.)
+        $request = Craft::$app->getRequest();
+        if (Craft::$app->getConfig()->getGeneral()->enableCsrfProtection) {
+            $csrf = [
+                'name' => $request->csrfParam,
+                'value' => $request->getCsrfToken(),
+            ];
+            $view->registerJs(
+                'window.smokeCsrf = ' . json_encode($csrf) . ';',
+                View::POS_HEAD
+            );
+        }
 
         // Inject the editor container HTML at the end of the body
         $oldTemplateMode = $view->getTemplateMode();

@@ -32,7 +32,7 @@
         type="hidden"
         name="{{ fieldHandle }}"
         value="{{ currentAssets|map(a => a.id)|join(',') }}"
-        data-model="fields.{{ fieldHandle }}"
+        data-bind="fields.{{ fieldHandle }}"
     >
 
     <p style="font-size: 12px; color: #6b7280; margin-top: 12px;">

@@ -1,26 +1,27 @@
-{# Rich Text (CKEditor) Field Editor #}
+{# Rich Text Field Editor (CKEditor / Redactor — both extend Craft's HtmlField).
+
+   A framework-agnostic contenteditable + toolbar produces HTML. A hidden textarea is
+   bound to the DataStar `fields.<handle>` signal; smoke.js syncs the contenteditable's
+   HTML into it (and dispatches input) so the existing save path is unchanged.
+
+   We seed from getRawContent() so ref tags like {asset:123:url} survive the round-trip. #}
+{% set rawValue = value.getRawContent is defined ? value.getRawContent() : value %}
 
 <div class="smoke-field-group">
     <label class="smoke-field-label">
         {{ field.name }}
-        {% if field.required %}
-            <span class="smoke-field-required">*</span>
-        {% endif %}
+        {% if field.required %}<span class="smoke-field-required">*</span>{% endif %}
     </label>
 
     {% if field.instructions %}
         <span class="smoke-field-instructions">{{ field.instructions }}</span>
     {% endif %}
 
-    <textarea
-        class="smoke-textarea"
-        name="{{ fieldHandle }}"
-        {% if field.required %}required{% endif %}
-        data-model="fields.{{ fieldHandle }}"
-        rows="10"
-    >{{ value }}</textarea>
+    {# smoke.js injects the toolbar and wires the editor. #}
+    <div class="smoke-richtext" data-smoke-richtext>
+        <div class="smoke-richtext-editable" contenteditable="true">{{ rawValue|raw }}</div>
 
-    <p style="font-size: 12px; color: #6b7280; margin-top: 8px;">
-        Note: Full CKEditor integration coming soon. HTML is supported.
-    </p>
+        {# Hidden, DataStar-bound mirror of the editor's HTML #}
+        <textarea class="smoke-richtext-input" name="{{ fieldHandle }}" data-bind="fields.{{ fieldHandle }}" hidden>{{ rawValue }}</textarea>
+    </div>
 </div>

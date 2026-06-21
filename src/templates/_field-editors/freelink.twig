@@ -1,0 +1,57 @@
+{# FreeLink Field Editor (panel-only) — edits the first link of the collection.
+
+   FreeLink's value normalizes from a single-link array with a top-level `type` key,
+   so the inputs bind to fields.<handle>.{type,value,label,newWindow}. Element-reference
+   link types (entry/asset/…) need the CP element selector, so they're shown read-only. #}
+
+{% set link = value.first() %}
+{% set type = link ? link.type : 'url' %}
+{% set elementTypes = ['entry', 'category', 'asset', 'user', 'site', 'product', 'variant'] %}
+
+<div class="smoke-field-group">
+    <label class="smoke-field-label">
+        {{ field.name }}
+        {% if field.required %}<span class="smoke-field-required">*</span>{% endif %}
+    </label>
+
+    {% if field.instructions %}
+        <span class="smoke-field-instructions">{{ field.instructions }}</span>
+    {% endif %}
+
+    {% if type in elementTypes %}
+        <p class="smoke-field-instructions">
+            This link points to a {{ type }} and can be edited in the control panel.
+        </p>
+        {% if link %}<p style="margin-top:8px;">{{ link.getLink() }}</p>{% endif %}
+    {% else %}
+        {# Preserve the existing link type (url / email / phone / sms / custom). #}
+        <input type="hidden" data-bind="fields.{{ fieldHandle }}.type" value="{{ type }}">
+
+        <label class="smoke-field-sublabel" style="display:block; margin-top:8px; font-size:12px; color:#6b7280;">URL</label>
+        <input
+            type="text"
+            class="smoke-input"
+            data-bind="fields.{{ fieldHandle }}.value"
+            value="{{ link ? link.value : '' }}"
+            placeholder="https://"
+        >
+
+        <label class="smoke-field-sublabel" style="display:block; margin-top:8px; font-size:12px; color:#6b7280;">Link text</label>
+        <input
+            type="text"
+            class="smoke-input"
+            data-bind="fields.{{ fieldHandle }}.label"
+            value="{{ link ? link.label : '' }}"
+        >
+
+        <label class="smoke-lightswitch" style="margin-top:12px;">
+            <input
+                type="checkbox"
+                data-bind="fields.{{ fieldHandle }}.newWindow"
+                {% if link and link.newWindow %}checked{% endif %}
+            >
+            <span class="smoke-lightswitch-slider"></span>
+            Open in new window
+        </label>
+    {% endif %}
+</div>
