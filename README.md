@@ -83,13 +83,25 @@ In your component templates, add `craft.smoke.editable()` attributes to editable
 | Type | Status |
 |------|--------|
 | Plain Text | Fully functional (inline + panel editing) |
-| Rich Text (CKEditor) | Panel editing (basic textarea) |
-| Lightswitch | Fully functional |
-| Dropdown | Fully functional |
-| Table | Fully functional (add/remove rows) |
+| Rich Text (CKEditor / Redactor) | Inline + panel WYSIWYG (contenteditable + toolbar) |
+| Lightswitch | Fully functional (inline toggle + panel) |
+| Dropdown | Fully functional (inline + panel) |
+| Table | Fully functional (panel; add/remove rows) |
+| FreeLink | Panel editing (URL / text / new-window) |
+| Hyper | Panel editing (first link: URL / text / new-window) |
 | Assets | Display only |
 | Entries / Categories / Tags / Users | Display only |
 | Matrix | Display only |
+
+### Known limitations
+
+- **Rich text with inline asset/element references:** If a Rich Text field's content
+  contains Craft reference tags (e.g. `{asset:123:url}`), the frontend editor shows the
+  raw tag rather than the resolved URL while editing. This is intentional — editing the
+  raw content preserves the reference on save (it would otherwise be flattened to a hard
+  URL). Content without inline references is unaffected.
+- **Hyper fields** must have their link types configured (saved once in the control
+  panel); a freshly-created Hyper field with no configured link types silently drops links.
 
 ## Twig API
 
