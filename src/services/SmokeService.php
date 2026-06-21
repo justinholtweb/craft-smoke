@@ -128,6 +128,12 @@ class SmokeService extends Component
     {
         $type = $this->getFieldEditorType(get_class($field));
 
+        // Table cells are posted as a JSON string (serialized by smoke.js); decode to rows.
+        if ($type === 'table' && is_string($value)) {
+            $decoded = json_decode($value, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+
         if ($type === 'hyper' && is_array($value)) {
             return [
                 [

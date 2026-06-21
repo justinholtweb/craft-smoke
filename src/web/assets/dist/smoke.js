@@ -19,12 +19,16 @@
         // Setup inline editing for editable fields
         setupInlineEditing();
 
-        // Wire any rich-text editors already on the page, and any that the panel
-        // morphs in later (the panel content is patched in after load by DataStar).
-        wireRichEditors(document);
+        // Wire rich-text + table editors already on the page, and any the panel morphs
+        // in later (the panel content is patched in after load by DataStar).
+        const wirePanelEditors = function(root) {
+            wireRichEditors(root);
+            wireTableEditors(root);
+        };
+        wirePanelEditors(document);
         const editor = document.getElementById('smoke-editor');
         if (editor && window.MutationObserver) {
-            new MutationObserver(function() { wireRichEditors(editor); })
+            new MutationObserver(function() { wirePanelEditors(editor); })
                 .observe(editor, { childList: true, subtree: true });
         }
 
@@ -507,45 +511,57 @@
     };
 
     /**
-     * Initialize rich text editor (CKEditor)
+     * Wire panel table editors: serialize rows to a hidden DataStar-bound JSON textarea
+     * on every change, and handle add/remove row.
      */
-    window.smokeInitRichText = function(elementId) {
-        // This would integrate with CKEditor
-        // For POC, we'll use a simple textarea
-        console.log('Rich text editor initialized for', elementId);
-    };
+    function wireTableEditors(root) {
+        root.querySelectorAll('[data-smoke-table]:not([data-smoke-wired])').forEach(function(wrap) {
+            wrap.setAttribute('data-smoke-wired', '1');
 
-    /**
-     * Add table row
-     */
-    window.smokeAddTableRow = function(tableId) {
-        const table = document.getElementById(tableId);
-        if (!table) return;
+            const input = wrap.querySelector('.smoke-table-input');
+            const tbody = wrap.querySelector('tbody');
+            if (!input || !tbody) {
+                return;
+            }
 
-        const tbody = table.querySelector('tbody');
-        const firstRow = tbody.querySelector('tr');
+            const serialize = function() {
+                const rows = [];
+                tbody.querySelectorAll('tr').forEach(function(tr) {
+                    const row = {};
+                    tr.querySelectorAll('input[data-col]').forEach(function(cell) {
+                        row[cell.getAttribute('data-col')] = cell.value;
+                    });
+                    rows.push(row);
+                });
+                input.value = JSON.stringify(rows);
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            };
 
-        if (firstRow) {
-            const newRow = firstRow.cloneNode(true);
-            // Clear input values
-            newRow.querySelectorAll('input').forEach(input => {
-                input.value = '';
+            wrap.addEventListener('input', function(e) {
+                if (e.target.matches('input[data-col]')) {
+                    serialize();
+                }
             });
-            tbody.appendChild(newRow);
-        }
-    };
 
-    /**
-     * Remove table row
-     */
-    window.smokeRemoveTableRow = function(button) {
-        const row = button.closest('tr');
-        const tbody = row.closest('tbody');
+            wrap.addEventListener('click', function(e) {
+                if (e.target.matches('.smoke-table-add')) {
+                    const template = tbody.querySelector('tr');
+                    if (template) {
+                        const newRow = template.cloneNode(true);
+                        newRow.querySelectorAll('input').forEach(function(i) { i.value = ''; });
+                        tbody.appendChild(newRow);
+                        serialize();
+                    }
+                } else if (e.target.matches('.smoke-table-remove')) {
+                    if (tbody.querySelectorAll('tr').length > 1) {
+                        e.target.closest('tr').remove();
+                        serialize();
+                    }
+                }
+            });
 
-        // Don't remove if it's the only row
-        if (tbody.querySelectorAll('tr').length > 1) {
-            row.remove();
-        }
-    };
+            serialize(); // seed the hidden input from the initial rows
+        });
+    }
 
 })();

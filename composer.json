@@ -2,7 +2,7 @@
     "name": "justinholtweb/craft-smoke",
     "description": "On-page frontend editing for Craft CMS using DataStar",
     "type": "craft-plugin",
-    "version": "0.1.12",
+    "version": "5.0.0",
     "keywords": [
         "craft",
         "cms",
@@ -42,7 +42,7 @@
         "name": "Smoke",
         "handle": "smoke",
         "developer": "Justin Holt",
-        "developerUrl": "https://github.com/justinholtweb",
+        "developerUrl": "https://justinholt.com",
         "documentationUrl": "https://github.com/justinholtweb/craft-smoke",
         "changelogUrl": "https://raw.githubusercontent.com/justinholtweb/craft-smoke/main/CHANGELOG.md",
         "class": "justinholtweb\\smoke\\Plugin"
