@@ -20,6 +20,9 @@ class SmokeAsset extends AssetBundle
         ];
 
         $this->js = [
+            // DataStar 1.0 is an ES module; register it with type="module".
+            // Vendored locally (see dist/datastar.js) to avoid a CDN runtime dependency.
+            ['datastar.js', 'type' => 'module'],
             'smoke.js',
         ];
 

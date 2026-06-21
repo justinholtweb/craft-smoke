@@ -50,6 +50,7 @@ class SaveController extends Controller
         }
 
         // Set the field value
+        $value = Plugin::getInstance()->smoke->prepareValueForSave($field, $value);
         $element->setFieldValue($fieldHandle, $value);
 
         // Validate and save
@@ -81,21 +82,27 @@ class SaveController extends Controller
         $this->requireLogin();
         $this->requirePostRequest();
 
-        $elementId = Craft::$app->getRequest()->getBodyParam('elementId');
+        // The panel posts DataStar signals as a JSON body: {smokeElementId, fields: {...}, ...}
+        $elementId = Craft::$app->getRequest()->getBodyParam('smokeElementId');
         $fields = Craft::$app->getRequest()->getBodyParam('fields', []);
 
         $element = Entry::find()->id($elementId)->one();
 
         if (!$element || !Plugin::getInstance()->smoke->canEdit($element)) {
             return DatastarHelper::response([
-                'signal' => [
+                'signals' => [
                     'smokeError' => 'Permission denied',
                 ],
             ]);
         }
 
         // Set all field values
+        $smoke = Plugin::getInstance()->smoke;
         foreach ($fields as $fieldHandle => $value) {
+            $field = $element->getFieldLayout()?->getFieldByHandle($fieldHandle);
+            if ($field) {
+                $value = $smoke->prepareValueForSave($field, $value);
+            }
             $element->setFieldValue($fieldHandle, $value);
         }
 
@@ -105,7 +112,7 @@ class SaveController extends Controller
             $errorMessage = 'Failed to save: ' . implode(', ', array_values($errors)[0] ?? ['Unknown error']);
 
             return DatastarHelper::response([
-                'signal' => [
+                'signals' => [
                     'smokeError' => $errorMessage,
                     'smokeSaving' => false,
                 ],
@@ -113,11 +120,53 @@ class SaveController extends Controller
         }
 
         return DatastarHelper::response([
-            'signal' => [
+            'signals' => [
                 'smokeSuccess' => 'All changes saved successfully',
                 'smokeSaving' => false,
                 'smokeEditorOpen' => false,
+                // Updated values for any on-page display elements, applied client-side by
+                // smoke.js so the page refreshes live without a reload.
+                'smokeSavedFields' => $this->savedFieldValues($element, array_keys($fields)),
             ],
         ]);
+    }
+
+    /**
+     * Build a map of saved field values for refreshing on-page display elements
+     * (the `[data-smoke-editable]` elements rendered by craft.smoke.editable()).
+     *
+     * @return array<string, array{value: string, html: bool}> Keyed by field handle.
+     *     `html` = true means the value is HTML (set via innerHTML), false means plain text.
+     */
+    private function savedFieldValues($element, array $fieldHandles): array
+    {
+        $smoke = Plugin::getInstance()->smoke;
+        $saved = [];
+
+        foreach ($fieldHandles as $handle) {
+            $field = $element->getFieldLayout()?->getFieldByHandle($handle);
+            if (!$field) {
+                continue;
+            }
+
+            $type = $smoke->getFieldEditorType(get_class($field));
+            $value = $element->getFieldValue($handle);
+
+            // Only refresh field types whose display is a simple value. Rich text is HTML;
+            // everything else is plain text. Complex/relational types are skipped.
+            $entry = match ($type) {
+                'plaintext' => ['value' => (string)$value, 'html' => false],
+                // Dropdown displays its option label, not the stored value.
+                'dropdown' => ['value' => (string)($value->label ?? $value), 'html' => false],
+                'richtext' => ['value' => (string)$value, 'html' => true],
+                default => null,
+            };
+
+            if ($entry !== null) {
+                $saved[$handle] = $entry;
+            }
+        }
+
+        return $saved;
     }
 }

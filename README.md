@@ -50,21 +50,21 @@ php craft plugin/install smoke
 Add to your main layout template (e.g., `templates/_layout.twig`):
 
 ```twig
-{% do smoke.init() %}
+{% do craft.smoke.init() %}
 ```
 
 This automatically injects the editor container, assets, and DataStar for logged-in users with edit permissions.
 
 ### 2. Mark Fields as Editable
 
-In your component templates, add `smoke.editable()` attributes to editable elements:
+In your component templates, add `craft.smoke.editable()` attributes to editable elements:
 
 ```twig
-<h1 {{ smoke.editable(entry, 'title')|raw }}>
+<h1 {{ craft.smoke.editable(entry, 'title')|raw }}>
     {{ entry.title }}
 </h1>
 
-<div {{ smoke.editable(entry, 'bodyContent')|raw }}>
+<div {{ craft.smoke.editable(entry, 'bodyContent')|raw }}>
     {{ entry.bodyContent }}
 </div>
 ```
@@ -93,16 +93,16 @@ In your component templates, add `smoke.editable()` attributes to editable eleme
 
 ## Twig API
 
-### `smoke.init()`
+### `craft.smoke.init()`
 Loads DataStar, registers CSS/JS assets, and injects the editor container.
 
-### `smoke.canEdit(entry)`
+### `craft.smoke.canEdit(entry)`
 Returns `true` if the current user can edit the element.
 
-### `smoke.editable(entry, 'fieldHandle')`
+### `craft.smoke.editable(entry, 'fieldHandle')`
 Returns HTML data attributes that mark an element as editable.
 
-### `smoke.editButton(entry, options)`
+### `craft.smoke.editButton(entry, options)`
 Generates an edit button element. Options: `label` (default: `'Edit'`), `class`.
 
 ## Adding Field Type Support
@@ -114,9 +114,9 @@ Generates an edit button element. Options: `label` (default: `'Edit'`), `class`.
 
 ## Troubleshooting
 
-**Edit button doesn't appear** — Ensure you're logged in with edit permissions and `smoke.init()` is called in your layout.
+**Edit button doesn't appear** — Ensure you're logged in with edit permissions and `craft.smoke.init()` is called in your layout.
 
-**Fields aren't editable** — Verify `smoke.editable()` is added, the field type is supported, and the field exists in the entry's field layout.
+**Fields aren't editable** — Verify `craft.smoke.editable()` is added, the field type is supported, and the field exists in the entry's field layout.
 
 **Save fails** — Check PHP error logs, verify the field handle is correct and you have edit permissions.
 

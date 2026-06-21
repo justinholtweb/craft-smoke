@@ -1,5 +1,55 @@
 /* Smoke Editor Styles */
 
+/* Rich text (contenteditable) editor */
+.smoke-richtext-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+.smoke-richtext-toolbar button {
+    padding: 4px 9px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1.2;
+    color: #1e293b;
+}
+.smoke-richtext-toolbar button:hover {
+    background: #f1f5f9;
+}
+.smoke-richtext-linkbox {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+}
+.smoke-richtext-linkbox[hidden] {
+    display: none; /* explicit display above would otherwise override the hidden attribute */
+}
+.smoke-richtext-linkinput {
+    padding: 3px 6px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-size: 13px;
+    min-width: 180px;
+}
+.smoke-richtext-editable {
+    min-height: 120px;
+    max-height: 360px;
+    overflow-y: auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 8px 10px;
+    background: #fff;
+    font-size: 14px;
+}
+.smoke-richtext-editable:focus {
+    outline: 2px solid #2563eb;
+    outline-offset: -1px;
+}
+
 /* Editable field indicator */
 [data-smoke-type="plaintext"] {
     position: relative;
@@ -152,6 +202,11 @@
 
 #smoke-editor[data-smoke-open="true"] {
     transform: translateX(0);
+}
+
+/* Lock page scroll while the panel is open (replaces the old JS scroll-lock) */
+body:has(#smoke-editor[data-smoke-open="true"]) {
+    overflow: hidden;
 }
 
 /* Mobile responsive */

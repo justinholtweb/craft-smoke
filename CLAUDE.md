@@ -61,9 +61,9 @@ src/
 | `SmokeVariable` | Twig API — `init()` injects assets/container, `editable()` returns data attributes |
 | `EditController` | `actionOpen()`, `actionField()`, `actionClose()` — returns DataStar SSE |
 | `SaveController` | `actionField()` (JSON), `actionAll()` (SSE) — saves element field values |
-| `DatastarHelper` | Static `response()` — formats fragment/signal events as SSE |
+| `DatastarHelper` | Static `response()` — formats DataStar 1.0 `patch-elements`/`patch-signals` SSE |
 | `Settings` | `enabled` boolean |
-| `SmokeAsset` | Registers `smoke.css` + `smoke.js` |
+| `SmokeAsset` | Registers `smoke.css`, `smoke.js`, and the vendored `datastar.js` (ES module) |
 
 ## Supported Field Types
 
@@ -82,21 +82,29 @@ src/
 | Matrix | — | Yes | Display only |
 
 ## Data Flow
-1. `{% do smoke.init() %}` in layout registers assets + injects editor container
-2. `{{ smoke.editable(entry, 'fieldHandle')|raw }}` adds `data-smoke-*` attributes
+1. `{% do craft.smoke.init() %}` in layout registers assets + injects editor container
+2. `{{ craft.smoke.editable(entry, 'fieldHandle')|raw }}` adds `data-smoke-*` attributes
 3. User clicks "Edit Page" → `GET /actions/smoke/edit/open?elementId=X`
-4. Server returns SSE `datastar-fragment` (edit panel HTML) + `datastar-signal` (state)
-5. User edits field → `POST /actions/smoke/save/field` (JSON response)
-6. Or saves all → `POST /actions/smoke/save/all` (SSE response)
+4. Server returns SSE `datastar-patch-elements` (edit panel HTML) + `datastar-patch-signals` (state)
+5. Inline edit → `POST /actions/smoke/save/field` (vanilla JS, JSON response, CSRF via `window.smokeCsrf`)
+6. Panel "Save all" → `POST /actions/smoke/save/all` (DataStar @post sends signals as JSON; SSE signal response)
 
-## SSE Event Format
+## SSE Event Format (DataStar 1.0 — line-based, not JSON-wrapped)
 ```
-event: datastar-fragment
-data: {"selector":"#smoke-editor","html":"...","merge":"morph"}
+event: datastar-patch-elements
+data: selector #smoke-editor
+data: mode inner
+data: elements <div class="smoke-panel-header">...</div>
 
-event: datastar-signal
-data: {"smokeEditorOpen":true,"smokeElementId":123}
+event: datastar-patch-signals
+data: signals {"smokeEditorOpen":true,"smokeElementId":123}
 ```
+Built by `DatastarHelper::response(['elements' => [...], 'signals' => [...]])`.
+
+## DataStar client conventions (1.0)
+- Vendored locally at `web/assets/dist/datastar.js` (v1.0.1), registered as an ES module.
+- Attributes: `data-on:click="@get('…')"` / `@post('…')`, `data-signals`, `data-bind="fields.handle"`, `data-show`, `data-text`, `data-attr:disabled`.
+- Twig API is `craft.smoke.*` (not a bare `smoke` global).
 
 ## Conventions
 - PHP namespace: `justinholtweb\smoke`

@@ -1,11 +1,11 @@
-{# Main Edit Panel #}
+{# Main Edit Panel — morphed into #smoke-editor #}
 
 <div class="smoke-panel-header">
     <h2 class="smoke-panel-title">Edit {{ element.title }}</h2>
     <button
         type="button"
         class="smoke-close-btn"
-        data-on-click="$$get('/actions/smoke/edit/close')"
+        data-on:click="@get('/actions/smoke/edit/close')"
         aria-label="Close"
     >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -17,19 +17,10 @@
 
 <div class="smoke-panel-content">
     <form
-        data-on-submit="$$post('/actions/smoke/save/all')"
-        data-store="{
-            smokeElementId: {{ element.id }},
-            smokeSaving: false,
-            fields: {}
-        }"
+        data-signals="{smokeElementId: {{ element.id }}, fields: {}}"
+        data-on:submit__prevent="$smokeSaving = true; @post('/actions/smoke/save/all', {headers: {'X-CSRF-Token': window.smokeCsrf.value}})"
     >
-        {# CSRF Token #}
-        {{ csrfInput() }}
-
-        <input type="hidden" name="elementId" value="{{ element.id }}">
-
-        {# Render each editable field #}
+        {# Render each editable field. Inputs two-way bind to the `fields.<handle>` signal. #}
         {% for fieldInfo in fields %}
             {% set field = element.getFieldLayout().getFieldByHandle(fieldInfo.handle) %}
             {% set value = element.getFieldValue(fieldInfo.handle) %}
@@ -46,7 +37,7 @@
         <button
             type="submit"
             class="smoke-save-btn"
-            data-bind-disabled="$smokeSaving"
+            data-attr:disabled="$smokeSaving"
         >
             <span data-show="!$smokeSaving">Save Changes</span>
             <span data-show="$smokeSaving" style="display: flex; align-items: center; justify-content: center;">

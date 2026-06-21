@@ -16,7 +16,7 @@
         class="smoke-select"
         name="{{ fieldHandle }}"
         {% if field.required %}required{% endif %}
-        data-model="fields.{{ fieldHandle }}"
+        data-bind="fields.{{ fieldHandle }}"
     >
         {% if not field.required %}
             <option value="">Select...</option>

@@ -45,12 +45,12 @@ class EditController extends Controller
 
         // Return DataStar SSE response
         return DatastarHelper::response([
-            'fragment' => [
+            'elements' => [
                 'selector' => '#smoke-editor',
+                'mode' => 'inner',
                 'html' => $html,
-                'merge' => 'morph',
             ],
-            'signal' => [
+            'signals' => [
                 'smokeEditorOpen' => true,
                 'smokeElementId' => $element->id,
             ],
@@ -91,10 +91,10 @@ class EditController extends Controller
         ], View::TEMPLATE_MODE_CP);
 
         return DatastarHelper::response([
-            'fragment' => [
+            'elements' => [
                 'selector' => '#smoke-field-editor',
+                'mode' => 'inner',
                 'html' => $html,
-                'merge' => 'morph',
             ],
         ]);
     }
@@ -105,7 +105,7 @@ class EditController extends Controller
     public function actionClose(): Response
     {
         return DatastarHelper::response([
-            'signal' => [
+            'signals' => [
                 'smokeEditorOpen' => false,
                 'smokeElementId' => null,
                 'smokeCurrentField' => null,
