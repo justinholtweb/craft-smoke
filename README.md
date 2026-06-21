@@ -117,12 +117,12 @@ Returns HTML data attributes that mark an element as editable.
 ### `craft.smoke.editButton(entry, options)`
 Generates an edit button element. Options: `label` (default: `'Edit'`), `class`.
 
-## Adding Field Type Support
+## Extending
 
-1. Add the field class to `SmokeService::isFieldTypeSupported()`
-2. Map it in `SmokeService::getFieldEditorType()`
-3. Create `src/templates/_field-editors/{type}.twig`
-4. Create `src/templates/_field-editors/{type}-display.twig`
+Smoke is extensible by modules and plugins via **field adapters** (support any field
+type, including ones from other plugins), **lifecycle events** (PHP + client-side JS), and
+**permissions**. See [docs/extending.md](docs/extending.md) for the full developer guide
+and examples.
 
 ## Troubleshooting
 
