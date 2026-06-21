@@ -5,169 +5,257 @@ namespace justinholtweb\smoke\services;
 use Craft;
 use craft\base\Component;
 use craft\base\ElementInterface;
-use craft\elements\Entry;
-use craft\elements\Asset;
-use craft\fields\PlainText;
+use craft\base\FieldInterface;
 use craft\fields\Assets as AssetsField;
-use craft\fields\Entries as EntriesField;
 use craft\fields\Categories as CategoriesField;
+use craft\fields\Entries as EntriesField;
+use craft\fields\Matrix;
 use craft\fields\Tags as TagsField;
 use craft\fields\Users as UsersField;
-use craft\fields\Lightswitch;
-use craft\fields\Dropdown;
-use craft\fields\Table;
-use craft\fields\Matrix;
 use craft\helpers\Json;
+use justinholtweb\smoke\base\FieldAdapterInterface;
+use justinholtweb\smoke\events\DefineCanEditEvent;
+use justinholtweb\smoke\events\DefineEditableFieldsEvent;
+use justinholtweb\smoke\events\FieldSaveEvent;
+use justinholtweb\smoke\events\RegisterFieldAdaptersEvent;
+use justinholtweb\smoke\events\SaveElementEvent;
+use justinholtweb\smoke\fieldadapters\DisplayFieldAdapter;
+use justinholtweb\smoke\fieldadapters\DropdownAdapter;
+use justinholtweb\smoke\fieldadapters\FreeLinkAdapter;
+use justinholtweb\smoke\fieldadapters\HyperAdapter;
+use justinholtweb\smoke\fieldadapters\LightswitchAdapter;
+use justinholtweb\smoke\fieldadapters\PlainTextAdapter;
+use justinholtweb\smoke\fieldadapters\RichTextAdapter;
+use justinholtweb\smoke\fieldadapters\TableAdapter;
+use justinholtweb\smoke\Plugin;
 
 /**
  * Smoke Service
  *
- * Core service for managing on-page editing functionality
+ * Core service for on-page editing. Field-type support is provided by field adapters
+ * (see {@see fieldAdapters()}); modules can register their own via
+ * {@see EVENT_REGISTER_FIELD_ADAPTERS}. Lifecycle hooks are exposed as events.
  */
 class SmokeService extends Component
 {
     /**
-     * Check if the current user can edit an entry
+     * @event RegisterFieldAdaptersEvent Register custom field adapters (takes precedence
+     * over the built-ins).
      */
-    public function canEdit(ElementInterface $element): bool
-    {
-        $user = Craft::$app->getUser()->getIdentity();
+    public const EVENT_REGISTER_FIELD_ADAPTERS = 'registerFieldAdapters';
 
-        if (!$user) {
+    /**
+     * @event DefineEditableFieldsEvent Modify which fields are editable for an element.
+     */
+    public const EVENT_DEFINE_EDITABLE_FIELDS = 'defineEditableFields';
+
+    /**
+     * @event DefineCanEditEvent Override whether the current user can edit an element.
+     */
+    public const EVENT_DEFINE_CAN_EDIT = 'defineCanEdit';
+
+    /**
+     * @event FieldSaveEvent Before a single field is saved (mutate value / cancel).
+     */
+    public const EVENT_BEFORE_SAVE_FIELD = 'beforeSaveField';
+
+    /**
+     * @event FieldSaveEvent After a single field is saved.
+     */
+    public const EVENT_AFTER_SAVE_FIELD = 'afterSaveField';
+
+    /**
+     * @event SaveElementEvent Before a panel "save all" persists the element.
+     */
+    public const EVENT_BEFORE_SAVE_ELEMENT = 'beforeSaveElement';
+
+    /**
+     * @event SaveElementEvent After a panel "save all" persists the element.
+     */
+    public const EVENT_AFTER_SAVE_ELEMENT = 'afterSaveElement';
+
+    /**
+     * Permission a user needs to edit content on the frontend (when settings require it).
+     */
+    public const PERMISSION_EDIT = 'smoke:editFrontend';
+
+    /** @var FieldAdapterInterface[]|null */
+    private ?array $_adapters = null;
+
+    // Permissions
+    // =========================================================================
+
+    /**
+     * Whether the current user can edit the given element on the frontend.
+     *
+     * The default decision is: the user can save the element (Craft's native permission)
+     * AND — when enabled in settings — holds the Smoke frontend-editing permission. Modules
+     * can override the result via {@see EVENT_DEFINE_CAN_EDIT}.
+     */
+    public function canEdit(?ElementInterface $element): bool
+    {
+        if (!$element) {
             return false;
         }
 
-        // Check if user can edit this entry
-        return Craft::$app->getElements()->canSave($element, $user);
+        $user = Craft::$app->getUser()->getIdentity();
+
+        $canEdit = $user !== null
+            && Craft::$app->getElements()->canSave($element, $user)
+            && (!Plugin::getInstance()->getSettings()->requirePermission || $user->can(self::PERMISSION_EDIT));
+
+        if ($this->hasEventHandlers(self::EVENT_DEFINE_CAN_EDIT)) {
+            $event = new DefineCanEditEvent([
+                'element' => $element,
+                'user' => $user,
+                'canEdit' => $canEdit,
+            ]);
+            $this->trigger(self::EVENT_DEFINE_CAN_EDIT, $event);
+            return $event->canEdit;
+        }
+
+        return $canEdit;
+    }
+
+    // Field adapters
+    // =========================================================================
+
+    /**
+     * All field adapters, module-registered first (so they can override the built-ins).
+     *
+     * @return FieldAdapterInterface[]
+     */
+    public function fieldAdapters(): array
+    {
+        if ($this->_adapters !== null) {
+            return $this->_adapters;
+        }
+
+        $event = new RegisterFieldAdaptersEvent();
+        $this->trigger(self::EVENT_REGISTER_FIELD_ADAPTERS, $event);
+
+        return $this->_adapters = array_merge($event->adapters, $this->builtInAdapters());
     }
 
     /**
-     * Get editable fields for an element
+     * The first adapter that handles the given field, or null if none does.
+     */
+    public function adapterFor(FieldInterface $field): ?FieldAdapterInterface
+    {
+        foreach ($this->fieldAdapters() as $adapter) {
+            if ($adapter->handles($field)) {
+                return $adapter;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return FieldAdapterInterface[]
+     */
+    private function builtInAdapters(): array
+    {
+        return [
+            new PlainTextAdapter(),
+            new RichTextAdapter(),
+            new LightswitchAdapter(),
+            new DropdownAdapter(),
+            new TableAdapter(),
+            new FreeLinkAdapter(),
+            new HyperAdapter(),
+            // Display-only (surfaced in the panel, not yet editable).
+            new DisplayFieldAdapter([AssetsField::class], 'assets'),
+            new DisplayFieldAdapter([EntriesField::class], 'entries'),
+            new DisplayFieldAdapter([CategoriesField::class], 'categories'),
+            new DisplayFieldAdapter([TagsField::class], 'tags'),
+            new DisplayFieldAdapter([UsersField::class], 'users'),
+            new DisplayFieldAdapter([Matrix::class], 'matrix'),
+        ];
+    }
+
+    /**
+     * Whether a field is supported for editing (i.e. an adapter handles it).
+     */
+    public function isFieldSupported(FieldInterface $field): bool
+    {
+        return $this->adapterFor($field) !== null;
+    }
+
+    /**
+     * The Smoke editor type for a field (e.g. 'plaintext'), or 'unknown'.
+     */
+    public function getFieldEditorType(FieldInterface $field): string
+    {
+        return $this->adapterFor($field)?->type() ?? 'unknown';
+    }
+
+    /**
+     * Render the panel editor HTML for a field.
+     */
+    public function renderFieldEditor(ElementInterface $element, FieldInterface $field, mixed $value): string
+    {
+        return $this->adapterFor($field)?->renderEditor($element, $field, $value) ?? '';
+    }
+
+    /**
+     * The live-refresh display value for a field, or null.
+     */
+    public function displayValue(FieldInterface $field, mixed $value): ?array
+    {
+        return $this->adapterFor($field)?->displayValue($field, $value);
+    }
+
+    /**
+     * Transform a posted value into the shape the field's setFieldValue() expects.
+     */
+    public function prepareValueForSave(FieldInterface $field, mixed $value): mixed
+    {
+        return $this->adapterFor($field)?->prepareValue($field, $value) ?? $value;
+    }
+
+    // Editable fields + attributes
+    // =========================================================================
+
+    /**
+     * Get editable field metadata for an element.
+     *
+     * @return array[] Each: ['handle', 'name', 'type', 'required', 'instructions'].
      */
     public function getEditableFields(ElementInterface $element): array
     {
         $fieldLayout = $element->getFieldLayout();
-
-        if (!$fieldLayout) {
-            return [];
-        }
-
         $editableFields = [];
 
-        foreach ($fieldLayout->getCustomFields() as $field) {
-            $fieldType = get_class($field);
-
-            // Only include supported field types
-            if ($this->isFieldTypeSupported($fieldType)) {
-                $editableFields[] = [
-                    'handle' => $field->handle,
-                    'name' => $field->name,
-                    'type' => $this->getFieldEditorType($fieldType),
-                    'required' => (bool)$field->required,
-                    'instructions' => $field->instructions,
-                ];
+        if ($fieldLayout) {
+            foreach ($fieldLayout->getCustomFields() as $field) {
+                $adapter = $this->adapterFor($field);
+                if ($adapter) {
+                    $editableFields[] = [
+                        'handle' => $field->handle,
+                        'name' => $field->name,
+                        'type' => $adapter->type(),
+                        'required' => (bool)$field->required,
+                        'instructions' => $field->instructions,
+                    ];
+                }
             }
+        }
+
+        if ($this->hasEventHandlers(self::EVENT_DEFINE_EDITABLE_FIELDS)) {
+            $event = new DefineEditableFieldsEvent([
+                'element' => $element,
+                'fields' => $editableFields,
+            ]);
+            $this->trigger(self::EVENT_DEFINE_EDITABLE_FIELDS, $event);
+            return $event->fields;
         }
 
         return $editableFields;
     }
 
     /**
-     * Check if a field type is supported for editing
-     */
-    public function isFieldTypeSupported(string $fieldClass): bool
-    {
-        return array_key_exists($fieldClass, $this->fieldTypeMap());
-    }
-
-    /**
-     * Get the editor type identifier for a field class
-     */
-    public function getFieldEditorType(string $fieldClass): string
-    {
-        return $this->fieldTypeMap()[$fieldClass] ?? 'unknown';
-    }
-
-    /**
-     * Map of field class (FQCN) => Smoke editor type.
-     *
-     * Third-party field types (CKEditor, Redactor, FreeLink, Hyper) are referenced by
-     * string FQCN rather than `::class`, so Smoke carries no hard dependency on those
-     * plugins being installed — absent classes simply never match a field on the page.
-     */
-    private function fieldTypeMap(): array
-    {
-        return [
-            // Core Craft fields
-            PlainText::class => 'plaintext',
-            Lightswitch::class => 'lightswitch',
-            Dropdown::class => 'dropdown',
-            Table::class => 'table',
-            AssetsField::class => 'assets',
-            EntriesField::class => 'entries',
-            CategoriesField::class => 'categories',
-            TagsField::class => 'tags',
-            UsersField::class => 'users',
-            Matrix::class => 'matrix',
-            // Third-party fields (string FQCNs — no hard dependency)
-            'craft\\ckeditor\\Field' => 'richtext',
-            'craft\\redactor\\Field' => 'richtext',
-            'justinholtweb\\freelink\\fields\\FreeLinkField' => 'freelink',
-            'verbb\\hyper\\fields\\HyperField' => 'hyper',
-        ];
-    }
-
-    /**
-     * Transform a posted value into the shape a field's setFieldValue() expects.
-     *
-     * Most fields accept the posted value directly. Hyper needs its list-of-blocks shape
-     * (see verbb\hyper — normalizeValue iterates the outer array as link blocks), so we wrap
-     * the posted {linkValue, linkText, newWindow} into a single URL-type link block.
-     */
-    public function prepareValueForSave($field, mixed $value): mixed
-    {
-        $type = $this->getFieldEditorType(get_class($field));
-
-        // Table cells are posted as a JSON string (serialized by smoke.js); decode to rows.
-        if ($type === 'table' && is_string($value)) {
-            $decoded = json_decode($value, true);
-            return is_array($decoded) ? $decoded : [];
-        }
-
-        if ($type === 'hyper' && is_array($value)) {
-            return [
-                [
-                    'type' => 'verbb\\hyper\\links\\Url',
-                    'handle' => 'default-verbb-hyper-links-url',
-                    'linkValue' => $value['linkValue'] ?? '',
-                    'linkText' => $value['linkText'] ?? '',
-                    'newWindow' => !empty($value['newWindow']),
-                    'fields' => [],
-                ],
-            ];
-        }
-
-        return $value;
-    }
-
-    /**
-     * Save field data to an entry
-     */
-    public function saveFieldData(int $entryId, string $fieldHandle, mixed $value): bool
-    {
-        $entry = Entry::find()->id($entryId)->one();
-
-        if (!$entry || !$this->canEdit($entry)) {
-            return false;
-        }
-
-        $entry->setFieldValue($fieldHandle, $value);
-
-        return Craft::$app->getElements()->saveElement($entry, false);
-    }
-
-    /**
-     * Generate DataStar attributes for an editable field
+     * Generate the data-smoke-* attributes for an editable field.
      */
     public function getEditableAttributes(ElementInterface $element, string $fieldHandle): array
     {
@@ -176,59 +264,101 @@ class SmokeService extends Component
         }
 
         $field = $element->getFieldLayout()?->getFieldByHandle($fieldHandle);
+        $adapter = $field ? $this->adapterFor($field) : null;
 
-        if (!$field) {
+        if (!$field || !$adapter) {
             return [];
         }
-
-        $fieldType = $this->getFieldEditorType(get_class($field));
 
         $attributes = [
             'data-smoke-editable' => 'true',
             'data-smoke-element-id' => $element->id,
             'data-smoke-field' => $fieldHandle,
-            'data-smoke-type' => $fieldType,
+            'data-smoke-type' => $adapter->type(),
         ];
 
-        // Type-specific config the inline editor (smoke.js) needs to render in place.
-        $config = $this->inlineConfig($field, $fieldType, $element->getFieldValue($fieldHandle));
-        if ($config !== null) {
-            $attributes['data-smoke-config'] = Json::encode($config);
+        if ($adapter->supportsInline()) {
+            $config = $adapter->inlineConfig($element, $field, $element->getFieldValue($fieldHandle));
+            if ($config !== null) {
+                $attributes['data-smoke-config'] = Json::encode($config);
+            }
         }
 
         return $attributes;
     }
 
+    // Saving
+    // =========================================================================
+
     /**
-     * Build the config blob an inline editor needs for a given field, or null if the
-     * field type has no inline editor (panel-only / display-only).
+     * Save a single field on an element, firing before/after events.
      */
-    private function inlineConfig($field, string $fieldType, mixed $value): ?array
+    public function saveField(ElementInterface $element, FieldInterface $field, mixed $value): bool
     {
-        return match ($fieldType) {
-            'plaintext' => [
-                'multiline' => (bool)($field->multiline ?? false),
-            ],
-            'dropdown' => [
-                'value' => (string)$value,
-                'options' => array_map(
-                    fn($opt) => ['value' => $opt['value'] ?? '', 'label' => $opt['label'] ?? ($opt['value'] ?? '')],
-                    array_values(array_filter($field->options ?? [], fn($opt) => !($opt['optgroup'] ?? false)))
-                ),
-            ],
-            'lightswitch' => [
-                'value' => (bool)$value,
-                'onLabel' => $field->onLabel ?: 'On',
-                'offLabel' => $field->offLabel ?: 'Off',
-            ],
-            // Seed inline rich-text editing from the RAW content so ref tags survive
-            // (the rendered DOM only has parsed HTML with refs already resolved).
-            'richtext' => [
-                'raw' => (is_object($value) && method_exists($value, 'getRawContent'))
-                    ? $value->getRawContent()
-                    : (string)$value,
-            ],
-            default => null,
-        };
+        $value = $this->prepareValueForSave($field, $value);
+
+        if ($this->hasEventHandlers(self::EVENT_BEFORE_SAVE_FIELD)) {
+            $event = new FieldSaveEvent(['element' => $element, 'field' => $field, 'value' => $value]);
+            $this->trigger(self::EVENT_BEFORE_SAVE_FIELD, $event);
+            if (!$event->isValid) {
+                return false;
+            }
+            $value = $event->value;
+        }
+
+        $element->setFieldValue($field->handle, $value);
+        $success = Craft::$app->getElements()->saveElement($element, false);
+
+        if ($this->hasEventHandlers(self::EVENT_AFTER_SAVE_FIELD)) {
+            $this->trigger(self::EVENT_AFTER_SAVE_FIELD, new FieldSaveEvent([
+                'element' => $element,
+                'field' => $field,
+                'value' => $value,
+                'isValid' => $success,
+            ]));
+        }
+
+        return $success;
+    }
+
+    /**
+     * Save several fields on an element (panel "save all"), firing before/after events.
+     *
+     * @param array<string, mixed> $values Map of fieldHandle => posted value.
+     */
+    public function saveAllFields(ElementInterface $element, array $values): bool
+    {
+        $fieldLayout = $element->getFieldLayout();
+
+        $prepared = [];
+        foreach ($values as $handle => $value) {
+            $field = $fieldLayout?->getFieldByHandle($handle);
+            $prepared[$handle] = $field ? $this->prepareValueForSave($field, $value) : $value;
+        }
+
+        if ($this->hasEventHandlers(self::EVENT_BEFORE_SAVE_ELEMENT)) {
+            $event = new SaveElementEvent(['element' => $element, 'values' => $prepared]);
+            $this->trigger(self::EVENT_BEFORE_SAVE_ELEMENT, $event);
+            if (!$event->isValid) {
+                return false;
+            }
+            $prepared = $event->values;
+        }
+
+        foreach ($prepared as $handle => $value) {
+            $element->setFieldValue($handle, $value);
+        }
+
+        $success = Craft::$app->getElements()->saveElement($element, false);
+
+        if ($this->hasEventHandlers(self::EVENT_AFTER_SAVE_ELEMENT)) {
+            $this->trigger(self::EVENT_AFTER_SAVE_ELEMENT, new SaveElementEvent([
+                'element' => $element,
+                'values' => $prepared,
+                'success' => $success,
+            ]));
+        }
+
+        return $success;
     }
 }

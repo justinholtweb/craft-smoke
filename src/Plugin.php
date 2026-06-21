@@ -5,6 +5,8 @@ namespace justinholtweb\smoke;
 use Craft;
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
+use craft\events\RegisterUserPermissionsEvent;
+use craft\services\UserPermissions;
 use craft\web\twig\variables\CraftVariable;
 use justinholtweb\smoke\models\Settings;
 use justinholtweb\smoke\services\SmokeService;
@@ -37,6 +39,7 @@ class Plugin extends BasePlugin
         parent::init();
 
         $this->_registerVariables();
+        $this->_registerPermissions();
 
         if (Craft::$app->getRequest()->getIsSiteRequest()) {
             $this->_registerSiteListeners();
@@ -66,6 +69,24 @@ class Plugin extends BasePlugin
                 /** @var CraftVariable $variable */
                 $variable = $event->sender;
                 $variable->set('smoke', SmokeVariable::class);
+            }
+        );
+    }
+
+    private function _registerPermissions(): void
+    {
+        Event::on(
+            UserPermissions::class,
+            UserPermissions::EVENT_REGISTER_PERMISSIONS,
+            function(RegisterUserPermissionsEvent $event) {
+                $event->permissions[] = [
+                    'heading' => 'Smoke',
+                    'permissions' => [
+                        SmokeService::PERMISSION_EDIT => [
+                            'label' => Craft::t('smoke', 'Edit content on the frontend'),
+                        ],
+                    ],
+                ];
             }
         );
     }

@@ -35,7 +35,17 @@ class EditController extends Controller
             ]);
         }
 
-        $fields = Plugin::getInstance()->smoke->getEditableFields($element);
+        $smoke = Plugin::getInstance()->smoke;
+        $fields = $smoke->getEditableFields($element);
+
+        // Render each field's editor via its adapter (so module-provided field types work).
+        foreach ($fields as &$info) {
+            $field = $element->getFieldLayout()?->getFieldByHandle($info['handle']);
+            $info['html'] = $field
+                ? $smoke->renderFieldEditor($element, $field, $element->getFieldValue($info['handle']))
+                : '';
+        }
+        unset($info);
 
         // Render the edit panel
         $html = Craft::$app->getView()->renderTemplate('smoke/_components/edit-panel', [
@@ -79,16 +89,9 @@ class EditController extends Controller
             return $this->asJson(['error' => 'Field not found']);
         }
 
-        $fieldType = Plugin::getInstance()->smoke->getFieldEditorType(get_class($field));
+        // Render the field editor via its adapter
         $value = $element->getFieldValue($fieldHandle);
-
-        // Render the field editor
-        $html = Craft::$app->getView()->renderTemplate("smoke/_field-editors/{$fieldType}", [
-            'element' => $element,
-            'field' => $field,
-            'fieldHandle' => $fieldHandle,
-            'value' => $value,
-        ], View::TEMPLATE_MODE_CP);
+        $html = Plugin::getInstance()->smoke->renderFieldEditor($element, $field, $value);
 
         return DatastarHelper::response([
             'elements' => [

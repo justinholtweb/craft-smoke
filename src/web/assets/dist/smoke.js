@@ -5,6 +5,15 @@
 (function() {
     'use strict';
 
+    /**
+     * Dispatch a bubbling `smoke:*` CustomEvent on document so modules can hook in.
+     * Events: smoke:panel-open, smoke:panel-close, smoke:edit-start, smoke:before-save,
+     * smoke:after-save, smoke:error, smoke:saved.
+     */
+    function dispatchSmoke(name, detail) {
+        document.dispatchEvent(new CustomEvent('smoke:' + name, { bubbles: true, detail: detail || {} }));
+    }
+
     // Initialize Smoke when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initSmoke);
@@ -30,6 +39,11 @@
         if (editor && window.MutationObserver) {
             new MutationObserver(function() { wirePanelEditors(editor); })
                 .observe(editor, { childList: true, subtree: true });
+
+            // Emit panel open/close events when $smokeEditorOpen toggles data-smoke-open.
+            new MutationObserver(function() {
+                dispatchSmoke(editor.getAttribute('data-smoke-open') === 'true' ? 'panel-open' : 'panel-close', { editor: editor });
+            }).observe(editor, { attributes: true, attributeFilter: ['data-smoke-open'] });
         }
 
         // Add keyboard shortcuts
@@ -265,6 +279,7 @@
      */
     function enterInlineEditMode(element, type, elementId, fieldHandle, config) {
         element.classList.add('smoke-editing');
+        dispatchSmoke('edit-start', { element: element, type: type, elementId: elementId, fieldHandle: fieldHandle });
         const originalContent = element.innerHTML;
 
         const built = buildInlineControl(type, element, config);
@@ -374,6 +389,8 @@
             formData.append(window.smokeCsrf.name, window.smokeCsrf.value);
         }
 
+        dispatchSmoke('before-save', { elementId: elementId, fieldHandle: fieldHandle, value: value });
+
         return fetch('/actions/smoke/save/field', {
             method: 'POST',
             body: formData,
@@ -384,7 +401,12 @@
             if (!data.success) {
                 throw new Error(data.error || 'Failed to save');
             }
+            dispatchSmoke('after-save', { elementId: elementId, fieldHandle: fieldHandle, value: value, data: data });
             return data;
+        })
+        .catch(err => {
+            dispatchSmoke('error', { elementId: elementId, fieldHandle: fieldHandle, error: err.message });
+            throw err;
         });
     }
 
@@ -446,6 +468,7 @@
                 }
             });
         });
+        dispatchSmoke('saved', { fields: saved });
     };
 
     /**
