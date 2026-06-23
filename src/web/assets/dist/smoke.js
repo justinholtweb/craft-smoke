@@ -5,6 +5,47 @@
 (function() {
     'use strict';
 
+    /**
+     * Dispatch a bubbling `smoke:*` CustomEvent on document so modules can hook in.
+     * Events: smoke:panel-open, smoke:panel-close, smoke:edit-start, smoke:before-save,
+     * smoke:after-save, smoke:error, smoke:saved.
+     */
+    function dispatchSmoke(name, detail) {
+        document.dispatchEvent(new CustomEvent('smoke:' + name, { bubbles: true, detail: detail || {} }));
+    }
+
+    /**
+     * Registry of inline editors, keyed by field type. Built-ins are registered the same
+     * way modules register their own (see window.Smoke.registerInlineEditor).
+     */
+    const inlineEditors = {};
+
+    function registerInlineEditor(type, definition) {
+        inlineEditors[type] = definition;
+    }
+
+    /**
+     * Public JS API for modules.
+     *
+     * Smoke.registerInlineEditor(type, definition) — make a field type inline-editable.
+     *   definition is either:
+     *     { build(element, config) -> { control, focusTarget?, getValue(), getDisplay(), isHtml? } }
+     *       for an edit-in-place control with Save/Cancel, or
+     *     { handleClick(ctx) } for an immediate / custom-UI editor, where ctx is
+     *       { element, elementId, fieldHandle, config, save(value, displayValue, isHtml), notify }.
+     *
+     * Smoke.saveField(elementId, fieldHandle, value) -> Promise — persist a single value.
+     * Smoke.notify(message, type) — show a toast ('success' | 'error').
+     */
+    window.Smoke = window.Smoke || {};
+    window.Smoke.registerInlineEditor = registerInlineEditor;
+    window.Smoke.saveField = function(elementId, fieldHandle, value) {
+        return postFieldValue(elementId, fieldHandle, value);
+    };
+    window.Smoke.notify = function(message, type) {
+        return showNotification(message, type);
+    };
+
     // Initialize Smoke when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initSmoke);
@@ -19,13 +60,22 @@
         // Setup inline editing for editable fields
         setupInlineEditing();
 
-        // Wire any rich-text editors already on the page, and any that the panel
-        // morphs in later (the panel content is patched in after load by DataStar).
-        wireRichEditors(document);
+        // Wire rich-text + table editors already on the page, and any the panel morphs
+        // in later (the panel content is patched in after load by DataStar).
+        const wirePanelEditors = function(root) {
+            wireRichEditors(root);
+            wireTableEditors(root);
+        };
+        wirePanelEditors(document);
         const editor = document.getElementById('smoke-editor');
         if (editor && window.MutationObserver) {
-            new MutationObserver(function() { wireRichEditors(editor); })
+            new MutationObserver(function() { wirePanelEditors(editor); })
                 .observe(editor, { childList: true, subtree: true });
+
+            // Emit panel open/close events when $smokeEditorOpen toggles data-smoke-open.
+            new MutationObserver(function() {
+                dispatchSmoke(editor.getAttribute('data-smoke-open') === 'true' ? 'panel-open' : 'panel-close', { editor: editor });
+            }).observe(editor, { attributes: true, attributeFilter: ['data-smoke-open'] });
         }
 
         // Add keyboard shortcuts
@@ -163,88 +213,74 @@
     }
 
     /**
-     * Setup inline editing for editable fields
+     * Setup inline editing via event delegation, so editors registered at any time
+     * (including by modules, before or after init) just work. A field is inline-editable
+     * when its data-smoke-type has a registered inline editor.
      */
     function setupInlineEditing() {
-        // Field types that support editing in place. Display-only / relational types
-        // (assets, entries, matrix, …) are intentionally excluded.
-        const INLINE_TYPES = ['plaintext', 'dropdown', 'lightswitch', 'richtext'];
-        const selector = INLINE_TYPES.map(t => '[data-smoke-editable][data-smoke-type="' + t + '"]').join(',');
+        document.addEventListener('click', function(e) {
+            const element = e.target.closest('[data-smoke-editable]');
+            if (!element || element.classList.contains('smoke-editing')) {
+                return;
+            }
+            const def = inlineEditors[element.getAttribute('data-smoke-type')];
+            if (!def) {
+                return;
+            }
+            e.stopPropagation();
 
-        document.querySelectorAll(selector).forEach(field => {
-            field.classList.add('smoke-inline-editable');
+            const elementId = element.getAttribute('data-smoke-element-id');
+            const fieldHandle = element.getAttribute('data-smoke-field');
+            let config = {};
+            try { config = JSON.parse(element.getAttribute('data-smoke-config') || '{}'); } catch (err) {}
 
-            field.addEventListener('click', function(e) {
-                if (this.classList.contains('smoke-editing')) {
-                    return;
+            if (typeof def.handleClick === 'function') {
+                def.handleClick(inlineContext(element, elementId, fieldHandle, config));
+            } else if (typeof def.build === 'function') {
+                enterInlineEditMode(element, elementId, fieldHandle, config, def);
+            }
+        });
+
+        // Hover affordance for any registered, editable field (delegated).
+        document.addEventListener('mouseover', function(e) {
+            const element = e.target.closest('[data-smoke-editable]');
+            if (element && inlineEditors[element.getAttribute('data-smoke-type')] && !element.classList.contains('smoke-editing')) {
+                element.classList.add('smoke-inline-editable');
+                if (!element.getAttribute('title')) {
+                    element.setAttribute('title', 'Click to edit ' + element.getAttribute('data-smoke-field'));
                 }
-                e.stopPropagation();
-
-                const type = this.getAttribute('data-smoke-type');
-                const elementId = this.getAttribute('data-smoke-element-id');
-                const fieldHandle = this.getAttribute('data-smoke-field');
-                let config = {};
-                try { config = JSON.parse(this.getAttribute('data-smoke-config') || '{}'); } catch (err) {}
-
-                // Lightswitch toggles immediately; the others open an in-place editor.
-                if (type === 'lightswitch') {
-                    toggleLightswitch(this, elementId, fieldHandle, config);
-                } else {
-                    enterInlineEditMode(this, type, elementId, fieldHandle, config);
-                }
-            });
-
-            field.addEventListener('mouseenter', function() {
-                this.setAttribute('title', 'Click to edit ' + this.getAttribute('data-smoke-field'));
-            });
+            }
         });
     }
 
     /**
-     * Build the inline control for a field type.
-     * @returns {{control: HTMLElement, getValue: function, getDisplay: function}}
+     * Build the context passed to a custom editor's handleClick.
      */
-    function buildInlineControl(type, element, config) {
-        if (type === 'richtext') {
-            // Seed from the RAW content (config.raw) so existing ref tags survive the save.
-            const wrap = document.createElement('div');
-            wrap.className = 'smoke-richtext';
-            const editable = document.createElement('div');
-            editable.className = 'smoke-richtext-editable';
-            editable.setAttribute('contenteditable', 'true');
-            editable.innerHTML = (config.raw !== undefined && config.raw !== null) ? config.raw : element.innerHTML;
-            wrap.appendChild(buildRichToolbar(editable, function() {}));
-            wrap.appendChild(editable);
-            return {
-                control: wrap,
-                focusTarget: editable,
-                isHtml: true,
-                getValue: () => editable.innerHTML,
-                getDisplay: () => editable.innerHTML
-            };
-        }
+    function inlineContext(element, elementId, fieldHandle, config) {
+        return {
+            element: element,
+            elementId: elementId,
+            fieldHandle: fieldHandle,
+            config: config,
+            notify: showNotification,
+            // Persist a value and (optionally) update the element's on-page display.
+            save: function(value, displayValue, isHtml) {
+                return postFieldValue(elementId, fieldHandle, value)
+                    .then(function(data) {
+                        if (displayValue !== undefined && displayValue !== null) {
+                            if (isHtml) { element.innerHTML = displayValue; } else { element.textContent = displayValue; }
+                        }
+                        showNotification('Saved successfully', 'success');
+                        return data;
+                    })
+                    .catch(function(err) { showNotification(err.message, 'error'); throw err; });
+            }
+        };
+    }
 
-        if (type === 'dropdown') {
-            const select = document.createElement('select');
-            select.className = 'smoke-inline-input';
-            (config.options || []).forEach(opt => {
-                const o = document.createElement('option');
-                o.value = opt.value;
-                o.textContent = opt.label;
-                if (opt.value === config.value) o.selected = true;
-                select.appendChild(o);
-            });
-            return {
-                control: select,
-                getValue: () => select.value,
-                getDisplay: () => {
-                    const opt = (config.options || []).find(o => o.value === select.value);
-                    return opt ? opt.label : select.value;
-                }
-            };
-        }
+    // --- Built-in inline control builders (registered below) ---
 
-        // plaintext — single- or multi-line
+    function buildPlainTextControl(element, config) {
         const input = document.createElement(config.multiline ? 'textarea' : 'input');
         if (!config.multiline) input.type = 'text';
         input.className = 'smoke-inline-input';
@@ -256,14 +292,54 @@
         };
     }
 
+    function buildDropdownControl(element, config) {
+        const select = document.createElement('select');
+        select.className = 'smoke-inline-input';
+        (config.options || []).forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.value;
+            o.textContent = opt.label;
+            if (opt.value === config.value) o.selected = true;
+            select.appendChild(o);
+        });
+        return {
+            control: select,
+            getValue: () => select.value,
+            getDisplay: () => {
+                const opt = (config.options || []).find(o => o.value === select.value);
+                return opt ? opt.label : select.value;
+            }
+        };
+    }
+
+    function buildRichTextControl(element, config) {
+        // Seed from the RAW content (config.raw) so existing ref tags survive the save.
+        const wrap = document.createElement('div');
+        wrap.className = 'smoke-richtext';
+        const editable = document.createElement('div');
+        editable.className = 'smoke-richtext-editable';
+        editable.setAttribute('contenteditable', 'true');
+        editable.innerHTML = (config.raw !== undefined && config.raw !== null) ? config.raw : element.innerHTML;
+        wrap.appendChild(buildRichToolbar(editable, function() {}));
+        wrap.appendChild(editable);
+        return {
+            control: wrap,
+            focusTarget: editable,
+            isHtml: true,
+            getValue: () => editable.innerHTML,
+            getDisplay: () => editable.innerHTML
+        };
+    }
+
     /**
-     * Enter inline edit mode for a field (plaintext / dropdown).
+     * Enter inline edit mode for a field, building its control via the registered editor.
      */
-    function enterInlineEditMode(element, type, elementId, fieldHandle, config) {
+    function enterInlineEditMode(element, elementId, fieldHandle, config, def) {
         element.classList.add('smoke-editing');
+        dispatchSmoke('edit-start', { element: element, type: element.getAttribute('data-smoke-type'), elementId: elementId, fieldHandle: fieldHandle });
         const originalContent = element.innerHTML;
 
-        const built = buildInlineControl(type, element, config);
+        const built = def.build(element, config);
 
         const actions = document.createElement('div');
         actions.className = 'smoke-inline-actions';
@@ -314,20 +390,22 @@
         setTimeout(() => document.addEventListener('click', closeOnClickOutside), 0);
     }
 
-    /**
-     * Toggle a lightswitch field in place (immediate save, no edit mode).
-     */
-    function toggleLightswitch(element, elementId, fieldHandle, config) {
-        const newValue = !config.value;
-        postFieldValue(elementId, fieldHandle, newValue ? '1' : '0')
-            .then(() => {
-                config.value = newValue;
-                element.setAttribute('data-smoke-config', JSON.stringify(config));
-                element.textContent = newValue ? (config.onLabel || 'On') : (config.offLabel || 'Off');
-                showNotification('Saved successfully', 'success');
-            })
-            .catch(err => showNotification(err.message, 'error'));
-    }
+    // Register the built-in inline editors through the same public API modules use.
+    registerInlineEditor('plaintext', { build: buildPlainTextControl });
+    registerInlineEditor('dropdown', { build: buildDropdownControl });
+    registerInlineEditor('richtext', { build: buildRichTextControl });
+    registerInlineEditor('lightswitch', {
+        // Immediate toggle, no edit-mode UI.
+        handleClick: function(ctx) {
+            const newValue = !ctx.config.value;
+            ctx.save(newValue ? '1' : '0', newValue ? (ctx.config.onLabel || 'On') : (ctx.config.offLabel || 'Off'), false)
+                .then(function() {
+                    ctx.config.value = newValue;
+                    ctx.element.setAttribute('data-smoke-config', JSON.stringify(ctx.config));
+                })
+                .catch(function() {});
+        }
+    });
 
     /**
      * Save an inline edit (plaintext / dropdown), then swap in the display value.
@@ -370,6 +448,8 @@
             formData.append(window.smokeCsrf.name, window.smokeCsrf.value);
         }
 
+        dispatchSmoke('before-save', { elementId: elementId, fieldHandle: fieldHandle, value: value });
+
         return fetch('/actions/smoke/save/field', {
             method: 'POST',
             body: formData,
@@ -380,7 +460,12 @@
             if (!data.success) {
                 throw new Error(data.error || 'Failed to save');
             }
+            dispatchSmoke('after-save', { elementId: elementId, fieldHandle: fieldHandle, value: value, data: data });
             return data;
+        })
+        .catch(err => {
+            dispatchSmoke('error', { elementId: elementId, fieldHandle: fieldHandle, error: err.message });
+            throw err;
         });
     }
 
@@ -442,6 +527,7 @@
                 }
             });
         });
+        dispatchSmoke('saved', { fields: saved });
     };
 
     /**
@@ -507,45 +593,57 @@
     };
 
     /**
-     * Initialize rich text editor (CKEditor)
+     * Wire panel table editors: serialize rows to a hidden DataStar-bound JSON textarea
+     * on every change, and handle add/remove row.
      */
-    window.smokeInitRichText = function(elementId) {
-        // This would integrate with CKEditor
-        // For POC, we'll use a simple textarea
-        console.log('Rich text editor initialized for', elementId);
-    };
+    function wireTableEditors(root) {
+        root.querySelectorAll('[data-smoke-table]:not([data-smoke-wired])').forEach(function(wrap) {
+            wrap.setAttribute('data-smoke-wired', '1');
 
-    /**
-     * Add table row
-     */
-    window.smokeAddTableRow = function(tableId) {
-        const table = document.getElementById(tableId);
-        if (!table) return;
+            const input = wrap.querySelector('.smoke-table-input');
+            const tbody = wrap.querySelector('tbody');
+            if (!input || !tbody) {
+                return;
+            }
 
-        const tbody = table.querySelector('tbody');
-        const firstRow = tbody.querySelector('tr');
+            const serialize = function() {
+                const rows = [];
+                tbody.querySelectorAll('tr').forEach(function(tr) {
+                    const row = {};
+                    tr.querySelectorAll('input[data-col]').forEach(function(cell) {
+                        row[cell.getAttribute('data-col')] = cell.value;
+                    });
+                    rows.push(row);
+                });
+                input.value = JSON.stringify(rows);
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            };
 
-        if (firstRow) {
-            const newRow = firstRow.cloneNode(true);
-            // Clear input values
-            newRow.querySelectorAll('input').forEach(input => {
-                input.value = '';
+            wrap.addEventListener('input', function(e) {
+                if (e.target.matches('input[data-col]')) {
+                    serialize();
+                }
             });
-            tbody.appendChild(newRow);
-        }
-    };
 
-    /**
-     * Remove table row
-     */
-    window.smokeRemoveTableRow = function(button) {
-        const row = button.closest('tr');
-        const tbody = row.closest('tbody');
+            wrap.addEventListener('click', function(e) {
+                if (e.target.matches('.smoke-table-add')) {
+                    const template = tbody.querySelector('tr');
+                    if (template) {
+                        const newRow = template.cloneNode(true);
+                        newRow.querySelectorAll('input').forEach(function(i) { i.value = ''; });
+                        tbody.appendChild(newRow);
+                        serialize();
+                    }
+                } else if (e.target.matches('.smoke-table-remove')) {
+                    if (tbody.querySelectorAll('tr').length > 1) {
+                        e.target.closest('tr').remove();
+                        serialize();
+                    }
+                }
+            });
 
-        // Don't remove if it's the only row
-        if (tbody.querySelectorAll('tr').length > 1) {
-            row.remove();
-        }
-    };
+            serialize(); // seed the hidden input from the initial rows
+        });
+    }
 
 })();

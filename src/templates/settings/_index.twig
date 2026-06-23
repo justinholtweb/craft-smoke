@@ -7,3 +7,11 @@
     name: 'enabled',
     on: settings.enabled,
 }) }}
+
+{{ forms.lightswitchField({
+    label: 'Require permission'|t('smoke'),
+    instructions: 'When on, editors also need the “Edit content on the frontend” permission (in addition to being able to edit the element in the control panel). Admins always pass.'|t('smoke'),
+    id: 'requirePermission',
+    name: 'requirePermission',
+    on: settings.requirePermission,
+}) }}

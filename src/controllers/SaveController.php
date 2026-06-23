@@ -5,35 +5,38 @@ namespace justinholtweb\smoke\controllers;
 use Craft;
 use craft\elements\Entry;
 use craft\web\Controller;
-use yii\web\Response;
 use justinholtweb\smoke\helpers\DatastarHelper;
 use justinholtweb\smoke\Plugin;
+use yii\web\Response;
 
 /**
  * Save Controller
  *
- * Handles saving field data from frontend edits
+ * Handles saving field data from frontend edits. Persistence + lifecycle events live in
+ * SmokeService (saveField / saveAllFields).
  */
 class SaveController extends Controller
 {
     protected array|int|bool $allowAnonymous = false;
 
     /**
-     * Save a single field value
+     * Save a single field value (inline edit).
      */
     public function actionField(): Response
     {
         $this->requireLogin();
         $this->requirePostRequest();
 
-        $elementId = Craft::$app->getRequest()->getBodyParam('elementId');
-        $fieldHandle = Craft::$app->getRequest()->getBodyParam('fieldHandle');
-        // Get value from either 'value' param or the field handle param
-        $value = Craft::$app->getRequest()->getBodyParam($fieldHandle) ?? Craft::$app->getRequest()->getBodyParam('value');
+        $request = Craft::$app->getRequest();
+        $elementId = $request->getBodyParam('elementId');
+        $fieldHandle = $request->getBodyParam('fieldHandle');
+        // The value comes in either as the field-handle param or a generic 'value' param.
+        $value = $request->getBodyParam($fieldHandle) ?? $request->getBodyParam('value');
 
+        $smoke = Plugin::getInstance()->smoke;
         $element = Entry::find()->id($elementId)->one();
 
-        if (!$element || !Plugin::getInstance()->smoke->canEdit($element)) {
+        if (!$element || !$smoke->canEdit($element)) {
             return $this->asJson([
                 'success' => false,
                 'error' => 'You do not have permission to edit this element',
@@ -43,39 +46,25 @@ class SaveController extends Controller
         $field = $element->getFieldLayout()?->getFieldByHandle($fieldHandle);
 
         if (!$field) {
-            return $this->asJson([
-                'success' => false,
-                'error' => 'Field not found',
-            ]);
+            return $this->asJson(['success' => false, 'error' => 'Field not found']);
         }
 
-        // Set the field value
-        $value = Plugin::getInstance()->smoke->prepareValueForSave($field, $value);
-        $element->setFieldValue($fieldHandle, $value);
-
-        // Validate and save
-        if (!Craft::$app->getElements()->saveElement($element, false)) {
-            $errors = $element->getErrors();
-            $errorMessage = 'Failed to save: ' . implode(', ', array_values($errors)[0] ?? ['Unknown error']);
-
+        if (!$smoke->saveField($element, $field, $value)) {
             return $this->asJson([
                 'success' => false,
-                'error' => $errorMessage,
+                'error' => $this->saveErrorMessage($element),
             ]);
         }
-
-        // Get the updated value
-        $updatedValue = $element->getFieldValue($fieldHandle);
 
         return $this->asJson([
             'success' => true,
-            'value' => $updatedValue,
+            'value' => $element->getFieldValue($fieldHandle),
             'message' => 'Saved successfully',
         ]);
     }
 
     /**
-     * Save all modified fields for an element
+     * Save all modified fields for an element (panel "save all").
      */
     public function actionAll(): Response
     {
@@ -83,37 +72,23 @@ class SaveController extends Controller
         $this->requirePostRequest();
 
         // The panel posts DataStar signals as a JSON body: {smokeElementId, fields: {...}, ...}
-        $elementId = Craft::$app->getRequest()->getBodyParam('smokeElementId');
-        $fields = Craft::$app->getRequest()->getBodyParam('fields', []);
+        $request = Craft::$app->getRequest();
+        $elementId = $request->getBodyParam('smokeElementId');
+        $fields = $request->getBodyParam('fields', []);
 
+        $smoke = Plugin::getInstance()->smoke;
         $element = Entry::find()->id($elementId)->one();
 
-        if (!$element || !Plugin::getInstance()->smoke->canEdit($element)) {
+        if (!$element || !$smoke->canEdit($element)) {
             return DatastarHelper::response([
-                'signals' => [
-                    'smokeError' => 'Permission denied',
-                ],
+                'signals' => ['smokeError' => 'Permission denied', 'smokeSaving' => false],
             ]);
         }
 
-        // Set all field values
-        $smoke = Plugin::getInstance()->smoke;
-        foreach ($fields as $fieldHandle => $value) {
-            $field = $element->getFieldLayout()?->getFieldByHandle($fieldHandle);
-            if ($field) {
-                $value = $smoke->prepareValueForSave($field, $value);
-            }
-            $element->setFieldValue($fieldHandle, $value);
-        }
-
-        // Validate and save
-        if (!Craft::$app->getElements()->saveElement($element, false)) {
-            $errors = $element->getErrors();
-            $errorMessage = 'Failed to save: ' . implode(', ', array_values($errors)[0] ?? ['Unknown error']);
-
+        if (!$smoke->saveAllFields($element, $fields)) {
             return DatastarHelper::response([
                 'signals' => [
-                    'smokeError' => $errorMessage,
+                    'smokeError' => $this->saveErrorMessage($element),
                     'smokeSaving' => false,
                 ],
             ]);
@@ -132,11 +107,23 @@ class SaveController extends Controller
     }
 
     /**
-     * Build a map of saved field values for refreshing on-page display elements
-     * (the `[data-smoke-editable]` elements rendered by craft.smoke.editable()).
+     * Build a friendly error message from an element's validation errors.
+     */
+    private function saveErrorMessage($element): string
+    {
+        $errors = $element->getErrors();
+        if (!$errors) {
+            return 'The save was cancelled.';
+        }
+
+        return 'Failed to save: ' . implode(', ', array_values($errors)[0] ?? ['Unknown error']);
+    }
+
+    /**
+     * Build a map of saved field values (via each field's adapter) for refreshing on-page
+     * display elements after a panel save.
      *
      * @return array<string, array{value: string, html: bool}> Keyed by field handle.
-     *     `html` = true means the value is HTML (set via innerHTML), false means plain text.
      */
     private function savedFieldValues($element, array $fieldHandles): array
     {
@@ -149,21 +136,9 @@ class SaveController extends Controller
                 continue;
             }
 
-            $type = $smoke->getFieldEditorType(get_class($field));
-            $value = $element->getFieldValue($handle);
-
-            // Only refresh field types whose display is a simple value. Rich text is HTML;
-            // everything else is plain text. Complex/relational types are skipped.
-            $entry = match ($type) {
-                'plaintext' => ['value' => (string)$value, 'html' => false],
-                // Dropdown displays its option label, not the stored value.
-                'dropdown' => ['value' => (string)($value->label ?? $value), 'html' => false],
-                'richtext' => ['value' => (string)$value, 'html' => true],
-                default => null,
-            };
-
-            if ($entry !== null) {
-                $saved[$handle] = $entry;
+            $display = $smoke->displayValue($field, $element->getFieldValue($handle));
+            if ($display !== null) {
+                $saved[$handle] = $display;
             }
         }
 
